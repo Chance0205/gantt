@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Production Schedule — Issue Nº 12</title>
+<meta name="viewport" content="width=1480" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4ede0;
+    --paper-2: #efe6d4;
+    --paper-3: #e8ddc6;
+    --ink: #1c1916;
+    --ink-2: #3a342d;
+    --ink-3: #6b6358;
+    --ink-4: #9a907f;
+    --line: #d8cdb4;
+    --line-2: #c4b89c;
+    --accent: #8a3a1f;       /* sepia-brick — matches the napkin */
+    --accent-2: #b8612e;
+    --clay: #c89a6e;
+    --olive: #6e7a3a;
+    --slate: #46555f;
+    --rose: #a05a55;
+    --plum: #6a4458;
+    --ok: #4f6b3d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(28,25,22,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+    background-position: 0 0;
+  }
+  .serif { font-family: "Instrument Serif", "Iowan Old Style", Georgia, serif; font-weight: 400; letter-spacing: -0.005em; }
+  .mono  { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .small-caps { text-transform: uppercase; letter-spacing: 0.14em; font-size: 10.5px; font-weight: 500; }
+
+  #root { padding: 36px 44px 56px; max-width: 1480px; margin: 0 auto; }
+</style>
+</head>
+<body>
+  <template id="__bundler_thumbnail" data-bg-color="#f4ede0">
+    <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      <rect x="120" y="180" width="960" height="44" fill="#e8ddc6" />
+      <rect x="120" y="240" width="960" height="1" fill="#c4b89c" />
+      <rect x="120" y="290" width="380" height="14" rx="2" fill="#8a3a1f" />
+      <rect x="200" y="330" width="520" height="14" rx="2" fill="#6e7a3a" />
+      <rect x="260" y="370" width="600" height="14" rx="2" fill="#6a4458" />
+      <rect x="380" y="410" width="480" height="14" rx="2" fill="#46555f" />
+      <rect x="500" y="450" width="500" height="14" rx="2" fill="#a05a55" />
+      <rect x="640" y="490" width="360" height="14" rx="2" fill="#8a3a1f" opacity="0.75" />
+      <rect x="690" y="180" width="2" height="350" fill="#8a3a1f" />
+      <rect x="120" y="100" width="320" height="40" fill="#1c1916" />
+    </svg>
+  </template>
+  <div id="root"></div>
+
+  <script type="application/json" id="__tweaks_defaults__">
+    /*EDITMODE-BEGIN*/{
+      "accent": "#8a3a1f",
+      "density": "compact",
+      "scale": "week",
+      "showDeps": true,
+      "showWeekend": true,
+      "owner": "all"
+    }/*EDITMODE-END*/
+  </script>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="gantt.jsx"></script>
+</body>
+</html>
