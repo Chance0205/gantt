@@ -1825,8 +1825,8 @@ function GanttGrid(props) {
                 borderBottom: "1px solid var(--line)",
                 background: isFocus ? "var(--paper-3)" :
                 isHover ? "rgba(232,221,198,0.5)" :
-                r.isSummary && lvl === 1 ? "var(--paper-3)" :
-                r.isSummary && lvl === 2 ? "rgba(232,221,198,0.35)" :
+                lvl === 1 ? "var(--paper-3)" :
+                lvl === 2 ? "rgba(232,221,198,0.35)" :
                 "transparent",
                 position: "relative"
               }}>
@@ -1856,8 +1856,8 @@ function GanttGrid(props) {
 
                 <span className="mono" style={{
                   fontSize: 10.5,
-                  color: r.isSummary ? "var(--ink-2)" : "var(--ink-4)",
-                  fontWeight: r.isSummary ? 600 : 400,
+                  color: lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)",
+                  fontWeight: lvl <= 2 ? 600 : 400,
                   minWidth: 36, letterSpacing: 0.3,
                   borderLeft: `2px solid ${rootColor}`,
                   paddingLeft: 6
@@ -1865,23 +1865,23 @@ function GanttGrid(props) {
 
                 <div
                   onClick={() => {
-                    if (r.isSummary) toggleCollapsed(r.id);else
-                    setFocusId(focusId === r.id ? null : r.id);
+                    if (r.isSummary) toggleCollapsed(r.id);
+                    else setFocusId(focusId === r.id ? null : r.id);
                   }}
                   style={{ minWidth: 0, flex: 1, cursor: r.isSummary ? "pointer" : "default" }}>
                   <EditableText
                     value={r.name}
                     onCommit={(v) => updateItem(r.id, { name: v })}
                     style={{
-                      fontSize: r.isSummary && lvl === 1 ? 15 : r.isSummary ? 12.5 : 12.5,
-                      fontWeight: r.isSummary ? 600 : 400,
+                      fontSize: lvl === 1 ? 15 : 12.5,
+                      fontWeight: lvl <= 2 ? 600 : 400,
                       color: "var(--ink)",
                       lineHeight: 1.15,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      fontFamily: r.isSummary && lvl === 1 ? "Instrument Serif, Georgia, serif" : "inherit",
-                      letterSpacing: r.isSummary && lvl === 1 ? "-0.005em" : 0
+                      fontFamily: lvl === 1 ? "Instrument Serif, Georgia, serif" : "inherit",
+                      letterSpacing: lvl === 1 ? "-0.005em" : 0
                     }} />
-                  {!r.isSummary &&
+                  {lvl === 3 &&
                   <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1 }}>
                       {fmtDate(r.start)} → {fmtDate(r.end)} · {dayDiff(r.start, r.end)}d
                     </div>
