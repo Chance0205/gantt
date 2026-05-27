@@ -136,6 +136,8 @@ const TODAY         = PROJECT_CONFIG.today || new Date();
 const d             = _d;   // 하위 호환 유지
 const TEAMS         = PROJECT_CONFIG.teams;
 const OWNERS        = PROJECT_CONFIG.owners;
+// ── owners/teams context (편집 가능하도록 Context로 관리) ──────────────────
+const OwnersCtx = React.createContext({ owners: OWNERS, teams: TEAMS });
 const ROOTS         = PROJECT_CONFIG.roots;
 const INITIAL_WBS   = PROJECT_CONFIG.initialWBS;
 const STORAGE_KEY   = PROJECT_CONFIG.storageKey;
@@ -261,6 +263,8 @@ function loadFromStorage() {
       items: deserializeItems(parsed.items),
       collapsed: parsed.collapsed || {},
       meta: parsed.meta || null,
+      owners: parsed.owners || null,
+      teams: parsed.teams || null,
     };
   } catch (e) {
     console.warn("Gantt: failed to load saved state", e);
@@ -268,12 +272,14 @@ function loadFromStorage() {
   }
 }
 
-function saveToStorage(items, collapsed, meta) {
+function saveToStorage(items, collapsed, meta, owners, teams) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       items: serializeItems(items),
       collapsed,
       meta,
+      owners,
+      teams,
       _savedAt: new Date().toISOString(),
     }));
   } catch (e) {
@@ -334,6 +340,29 @@ function App() {
     setMetaState((m) => ({ ...m, ...patch }));
   }, []);
 
+  // ── owners / teams (편집 가능한 팀원 목록) ─────────────────────────────
+  const [owners, setOwners] = useState(() => {
+    const saved = loadFromStorage();
+    return (saved && saved.owners) ? saved.owners : { ...PROJECT_CONFIG.owners };
+  });
+  const [teams, setTeams] = useState(() => {
+    const saved = loadFromStorage();
+    return (saved && saved.teams) ? saved.teams : PROJECT_CONFIG.teams.map((t) => ({ ...t, members: [...t.members] }));
+  });
+  const [showTeamModal, setShowTeamModal] = useState(false);
+
+  // 전역 OWNERS/TEAMS 동기화 (직접 참조하는 코드용)
+  useEffect(() => {
+    Object.keys(OWNERS).forEach((k) => delete OWNERS[k]);
+    Object.assign(OWNERS, owners);
+    TEAMS.splice(0, TEAMS.length, ...teams);
+  }, [owners, teams]);
+
+  const updateTeamData = useCallback((newOwners, newTeams) => {
+    setOwners(newOwners);
+    setTeams(newTeams);
+  }, []);
+
   useEffect(() => {
     document.title = `${meta.wbsPrefix} — ${meta.wbsSuffix}`;
   }, [meta.wbsPrefix, meta.wbsSuffix]);
@@ -361,7 +390,7 @@ function App() {
   });
 
   // Persist on every change (localStorage).
-  useEffect(() => { saveToStorage(items, collapsed, meta); }, [items, collapsed, meta]);
+  useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams); }, [items, collapsed, meta, owners, teams]);
 
   // ── Auto-save to local save server ───────────────────────────────────
   const SAVE_FILENAME = STORAGE_KEY + '.json';
@@ -400,6 +429,8 @@ function App() {
         items: serializeItems(items),
         collapsed,
         meta,
+        owners,
+        teams,
       });
       setSaveStatus('saving');
       fetch('/save?file=' + SAVE_FILENAME, {
@@ -411,7 +442,7 @@ function App() {
         .catch(() => setSaveStatus('offline'));
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [items, collapsed, meta]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Export current state as a JSON file the user can keep.
   const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta), [items, collapsed, meta]);
@@ -889,9 +920,10 @@ function App() {
   }, [enriched]);
 
   return (
+    <OwnersCtx.Provider value={{ owners, teams }}>
     <div>
       <Masthead stats={stats} meta={meta} updateMeta={updateMeta} />
-      <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} />
+      <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
       <div style={{
         background: "var(--paper-2)",
         border: "1px solid var(--line)",
@@ -936,7 +968,9 @@ function App() {
         
       </div>
       <Footer />
-    </div>);
+      {showTeamModal && <TeamModal owners={owners} teams={teams} onSave={updateTeamData} onClose={() => setShowTeamModal(false)} />}
+    </div>
+    </OwnersCtx.Provider>);
 
 }
 
@@ -1045,7 +1079,7 @@ function SaveIndicator({ status }) {
   );
 }
 
-function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus }) {
+function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
   const fileRef = useRef(null);
   return (
     <div style={{
@@ -1062,6 +1096,8 @@ function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus }) {
         <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
           onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImport(f); e.target.value = ""; }} />
+        <ToolbarBtn onClick={onTeam} title="팀원 목록 편집">👥 Team</ToolbarBtn>
+        <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
         <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
         <ToolbarBtn onClick={onReset} title="Discard changes and restore initial WBS" danger>↻ Reset</ToolbarBtn>
@@ -1090,7 +1126,8 @@ function ToolbarBtn({ onClick, title, danger, children }) {
 }
 
 function OwnerFilter({ value, onChange }) {
-  const owningTeam = TEAMS.find((t) => t.id === value || t.members.includes(value));
+  const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
+  const owningTeam = ctxTeams.find((t) => t.id === value || t.members.includes(value));
   const [expanded, setExpanded] = useState(owningTeam ? owningTeam.id : null);
   const isActive = (k) => k === value;
   const baseBtn = {
@@ -1113,7 +1150,7 @@ function OwnerFilter({ value, onChange }) {
         background: "var(--paper)"
       }}>
         <button onClick={() => onChange("all")} style={active("all")}>All</button>
-        {TEAMS.map((team) => {
+        {ctxTeams.map((team) => {
           const open = expanded === team.id;
           const teamActive = isActive(team.id);
           return (
@@ -1139,7 +1176,7 @@ function OwnerFilter({ value, onChange }) {
                 }}>{team.members.length}</span>
               </button>
               {open && team.members.map((mid) => {
-                const o = OWNERS[mid];
+                const o = ctxOwners[mid];
                 if (!o) return null;
                 const memberActive = isActive(mid);
                 return (
@@ -1220,6 +1257,7 @@ function GanttGrid(props) {
     removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, deleteItem
   } = props;
 
+  const { owners: ctxOwners } = React.useContext(OwnersCtx);
   const headerH = 56;
   const totalRowsHeight = rows.length * rowH;
 
@@ -1271,7 +1309,7 @@ function GanttGrid(props) {
             const indent = (lvl - 1) * 14;
             const isHover = hover === r.id;
             const isFocus = focusId === r.id;
-            const o = !r.isSummary ? OWNERS[r.owner] : null;
+            const o = !r.isSummary ? ctxOwners[r.owner] : null;
             const rootColor = colorFor(r.code);
             const isCollapsed = collapsed[r.id];
             return (
@@ -1806,7 +1844,8 @@ function SummaryTooltip({ r, color, rowH }) {
 }
 
 function LeafBar({ r, x, y, w, h, color, isHover, isFocus, onEnter, onLeave, onBarDown, onDepDown, isPreview, previewStart, previewEnd }) {
-  const o = OWNERS[r.owner];
+  const { owners: ctxOwners } = React.useContext(OwnersCtx);
+  const o = ctxOwners[r.owner];
   const fillW = (w - 2) * (r.pct / 100);
   const handleW = 6;
   return (
@@ -2046,8 +2085,9 @@ function EditableText({ value, onCommit, style, multiline }) {
 }
 
 function OwnerPicker({ value, onChange }) {
+  const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
-  const o = OWNERS[value];
+  const o = ctxOwners[value];
   if (!o) return null;
   return (
     <span
@@ -2071,7 +2111,7 @@ function OwnerPicker({ value, onChange }) {
               borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
               zIndex: 100, padding: 4, minWidth: 190, maxHeight: 320, overflowY: "auto",
             }}>
-            {TEAMS.map((team) => (
+            {ctxTeams.map((team) => (
               <React.Fragment key={team.id}>
                 <div className="mono small-caps" style={{
                   fontSize: 9.5, color: "var(--ink-4)", padding: "6px 8px 2px",
@@ -2081,7 +2121,7 @@ function OwnerPicker({ value, onChange }) {
                   <span>{team.members.length}</span>
                 </div>
                 {team.members.map((k) => {
-                  const o2 = OWNERS[k];
+                  const o2 = ctxOwners[k];
                   if (!o2) return null;
                   const active = k === value;
                   return (
@@ -2112,7 +2152,110 @@ function OwnerPicker({ value, onChange }) {
   );
 }
 
+// ── 팀원 편집 모달 ────────────────────────────────────────────────────────
+const TINT_PALETTE = [
+  "var(--accent)", "var(--rose)", "var(--olive)", "var(--plum)", "var(--slate)", "var(--clay)",
+  "#5b8c5a", "#6b4e71", "#3d7a8a", "#8a6a3d",
+];
+
+function TeamModal({ owners, teams, onSave, onClose }) {
+  const [eo, setEo] = useState(() => JSON.parse(JSON.stringify(owners)));
+  const [et, setEt] = useState(() => teams.map((t) => ({ ...t, members: [...t.members] })));
+
+  const updOwner = (id, patch) => setEo((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+  const delOwner = (id) => {
+    setEo((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    setEt((prev) => prev.map((t) => ({ ...t, members: t.members.filter((m) => m !== id) })));
+  };
+
+  const addOwner = (teamId) => {
+    const used = new Set(Object.values(eo).map((o) => o.tint));
+    const tint = TINT_PALETTE.find((c) => !used.has(c)) || TINT_PALETTE[0];
+    const id = "M" + Date.now().toString(36).slice(-4).toUpperCase();
+    setEo((prev) => ({ ...prev, [id]: { name: "", team: teamId, role: "", tint } }));
+    setEt((prev) => prev.map((t) => t.id === teamId ? { ...t, members: [...t.members, id] } : t));
+  };
+
+  const handleSave = () => {
+    // 빈 이름 필터링
+    const cleaned = Object.fromEntries(Object.entries(eo).filter(([, o]) => o.name.trim()));
+    const cleanedTeams = et.map((t) => ({ ...t, members: t.members.filter((m) => cleaned[m]) }));
+    onSave(cleaned, cleanedTeams);
+    onClose();
+  };
+
+  const inputStyle = {
+    border: "none", borderBottom: "1px solid var(--line-2)",
+    background: "transparent", outline: "none",
+    fontFamily: "IBM Plex Sans, sans-serif", color: "var(--ink)", padding: "2px 0",
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: 6,
+        boxShadow: "0 24px 60px -16px rgba(0,0,0,0.3)", width: 460,
+        maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+          <span className="serif" style={{ fontSize: 20, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)" }}>팀원 관리</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 15, padding: 4 }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: "auto", flex: 1, padding: "8px 20px 20px" }}>
+          {et.map((team) => (
+            <div key={team.id} style={{ marginTop: 18 }}>
+              <div className="mono small-caps" style={{ fontSize: 10.5, color: "var(--ink-3)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.1em" }}>
+                <span>{team.name}</span>
+                <span style={{ flex: 1, height: 1, background: "var(--line-2)" }} />
+                <span>{team.members.filter((m) => eo[m]).length}</span>
+              </div>
+              {/* Column headers */}
+              <div style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, padding: "0 0 4px", borderBottom: "1px solid var(--line)" }}>
+                {["", "ID", "이름", "직무", ""].map((h, i) => (
+                  <span key={i} className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em" }}>{h}</span>
+                ))}
+              </div>
+              {/* Member rows */}
+              {team.members.filter((m) => eo[m]).map((id) => {
+                const o = eo[id];
+                return (
+                  <div key={id} style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
+                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: o.tint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "var(--paper)", flexShrink: 0, fontFamily: "IBM Plex Mono, monospace" }}>{id.slice(0, 2)}</span>
+                    <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{id}</span>
+                    <input value={o.name} onChange={(e) => updOwner(id, { name: e.target.value })} placeholder="이름" style={{ ...inputStyle, fontSize: 13 }} />
+                    <input value={o.role} onChange={(e) => updOwner(id, { role: e.target.value })} placeholder="직무" style={{ ...inputStyle, fontSize: 11, fontFamily: "IBM Plex Mono, monospace", color: "var(--ink-3)" }} />
+                    <span onClick={() => delOwner(id)} style={{ cursor: "pointer", color: "var(--ink-4)", fontSize: 11, textAlign: "center", borderRadius: 2, lineHeight: "22px" }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = "#c44b3d"}
+                      onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>✕</span>
+                  </div>
+                );
+              })}
+              {/* Add button */}
+              <button onClick={() => addOwner(team.id)} style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--ink-4)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, padding: "4px 0", letterSpacing: "0.05em" }}
+                onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> {team.name}에 팀원 추가
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
+          <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>취소</button>
+          <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Footer() {
+  const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   return (
     <footer style={{ marginTop: 32, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
       <div>
@@ -2145,7 +2288,7 @@ function Footer() {
       <div>
         <div className="mono small-caps" style={{ color: "var(--ink-3)", marginBottom: 8 }}>Team</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {TEAMS.map((team) =>
+          {ctxTeams.map((team) =>
           <div key={team.id}>
               <div className="mono small-caps" style={{ color: "var(--ink-2)", marginBottom: 6, display: "flex", alignItems: "baseline", gap: 6 }}>
                 <span>{team.name}</span>
@@ -2154,7 +2297,7 @@ function Footer() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 {team.members.map((k) => {
-                const o = OWNERS[k];
+                const o = ctxOwners[k];
                 if (!o) return null;
                 return (
                   <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--ink-2)" }}>
