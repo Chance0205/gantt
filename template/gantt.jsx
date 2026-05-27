@@ -1235,29 +1235,36 @@ function OwnerFilter({ value, onChange }) {
     background: isActive(k) ? "var(--ink)" : "transparent",
     color: isActive(k) ? "var(--paper)" : "var(--ink-2)"
   });
+
+  const expandedTeam = ctxTeams.find((t) => t.id === expanded);
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span className="mono small-caps" style={{ color: "var(--ink-3)" }}>Owner</span>
-      <div style={{
-        display: "flex", flexWrap: "wrap", alignItems: "stretch",
-        border: "1px solid var(--line-2)", borderRadius: 3, overflow: "hidden",
-        background: "var(--paper)"
-      }}>
-        <button onClick={() => onChange("all")} style={active("all")}>All</button>
-        {ctxTeams.map((team) => {
-          const open = expanded === team.id;
-          const teamActive = isActive(team.id);
-          return (
-            <React.Fragment key={team.id}>
-              <button
+
+      {/* 버튼 스트립 + 드롭다운 wrapper */}
+      <div style={{ position: "relative" }}>
+        <div style={{
+          display: "flex", alignItems: "stretch",
+          border: "1px solid var(--line-2)", borderRadius: 3, overflow: "hidden",
+          background: "var(--paper)"
+        }}>
+          <button onClick={() => { onChange("all"); setExpanded(null); }} style={active("all")}>All</button>
+          {ctxTeams.map((team) => {
+            const open = expanded === team.id;
+            // 이 팀 소속 멤버 중 누군가가 선택돼 있으면 팀 버튼도 강조
+            const memberSelected = !isActive(team.id) && team.members.some((m) => isActive(m));
+            return (
+              <button key={team.id}
                 onClick={() => {
-                  if (teamActive && open) {setExpanded(null);return;}
-                  if (open && !teamActive) {onChange(team.id);return;}
                   onChange(team.id);
-                  setExpanded(team.id);
+                  setExpanded(open ? null : team.id);
                 }}
-                style={{ ...active(team.id), borderLeft: "1px solid var(--line-2)", fontWeight: 500 }}>
-                
+                style={{
+                  ...active(team.id),
+                  borderLeft: "1px solid var(--line-2)", fontWeight: 500,
+                  color: memberSelected ? "var(--accent)" : isActive(team.id) ? "var(--paper)" : "var(--ink-2)",
+                }}>
                 <span>{team.name}</span>
                 <span style={{
                   display: "inline-block",
@@ -1265,41 +1272,54 @@ function OwnerFilter({ value, onChange }) {
                   transition: "transform 160ms ease",
                   fontSize: 9, opacity: 0.6, marginLeft: 2
                 }}>▾</span>
-                <span className="mono" style={{
-                  fontSize: 10, opacity: isActive(team.id) ? 0.7 : 0.5, marginLeft: 2
-                }}>{team.members.length}</span>
+                <span className="mono" style={{ fontSize: 10, opacity: 0.5, marginLeft: 2 }}>{team.members.length}</span>
               </button>
-              {open && team.members.map((mid) => {
+            );
+          })}
+        </div>
+
+        {/* 드롭다운 (layout에 영향 없음) */}
+        {expanded && expandedTeam && (
+          <React.Fragment>
+            <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setExpanded(null)} />
+            <div style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 100,
+              background: "var(--paper-2)", border: "1px solid var(--line)",
+              borderRadius: 4, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.22)",
+              padding: 4, minWidth: 220,
+            }}>
+              {expandedTeam.members.map((mid) => {
                 const o = ctxOwners[mid];
                 if (!o) return null;
                 const memberActive = isActive(mid);
                 const cnt = ownerTaskCounts?.[mid] || 0;
                 const pct = totalLeaves > 0 ? Math.round(cnt / totalLeaves * 100) : 0;
                 return (
-                  <button key={mid} onClick={() => onChange(mid)} style={{
-                    ...baseBtn,
-                    background: memberActive ? "var(--ink)" : "var(--paper-2)",
-                    color: memberActive ? "var(--paper)" : "var(--ink-2)",
-                    borderLeft: "1px solid var(--line-2)",
-                    fontSize: 11.5,
-                  }}>
-                    <span style={{
-                      width: 6, height: 6, borderRadius: 99, flexShrink: 0,
-                      background: memberActive ? "var(--paper)" : o.tint
-                    }} />
-                    {o.name}
-                    <span style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: "auto", paddingLeft: 8 }}>
-                      <span style={{ width: 32, height: 3, background: memberActive ? "rgba(255,255,255,0.25)" : "var(--line-2)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                  <button key={mid}
+                    onClick={() => { onChange(mid); setExpanded(null); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8, width: "100%",
+                      padding: "5px 10px", border: "none", borderRadius: 2,
+                      background: memberActive ? "var(--ink)" : "transparent",
+                      color: memberActive ? "var(--paper)" : "var(--ink-2)",
+                      fontFamily: "inherit", fontSize: 12, cursor: "pointer", textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => { if (!memberActive) e.currentTarget.style.background = "var(--paper-3)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = memberActive ? "var(--ink)" : "transparent"; }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, flexShrink: 0, background: memberActive ? "var(--paper)" : o.tint }} />
+                    <span style={{ flex: 1 }}>{o.name}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ width: 36, height: 3, background: memberActive ? "rgba(255,255,255,0.25)" : "var(--line-2)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
                         <span style={{ display: "block", width: `${pct}%`, height: "100%", background: memberActive ? "var(--paper)" : o.tint, borderRadius: 2 }} />
                       </span>
-                      <span className="mono" style={{ fontSize: 9.5, minWidth: 26, color: memberActive ? "rgba(255,255,255,0.65)" : "var(--ink-4)", textAlign: "right" }}>{pct}%</span>
+                      <span className="mono" style={{ fontSize: 9.5, minWidth: 28, color: memberActive ? "rgba(255,255,255,0.65)" : "var(--ink-4)", textAlign: "right" }}>{pct}%</span>
                     </span>
-                  </button>);
-
+                  </button>
+                );
               })}
-            </React.Fragment>);
-
-        })}
+            </div>
+          </React.Fragment>
+        )}
       </div>
     </div>);
 
