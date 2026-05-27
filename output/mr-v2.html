@@ -1097,17 +1097,43 @@ function App() {
   }, []);
 
   // New leaf task added at end of list, level 1.
-  const addNewTask = useCallback(() => {
+  const addNewTask = useCallback((afterId) => {
     const id = `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const newItem = {
-      id, level: 1, name: "New task",
-      owner: "KE",
-      start: addDays(TODAY, 1),
-      end: addDays(TODAY, 8),
-      pct: 0
-    };
-    setItems((items) => [...items, newItem]);
-  }, []);
+    setItems((items) => {
+      const refId = afterId ?? (items.length > 0 ? items[items.length - 1].id : null);
+      let insertIdx = items.length;
+      let level = 3;
+      let owner = "KE";
+
+      if (refId) {
+        const idx = items.findIndex((it) => it.id === refId);
+        if (idx >= 0) {
+          const row = items[idx];
+          level = row.level;
+          owner = row.owner || owner;
+          if (!owner || !OWNERS[owner]) {
+            for (let k = idx - 1; k >= 0; k--) {
+              if (items[k].owner && OWNERS[items[k].owner]) { owner = items[k].owner; break; }
+            }
+          }
+          const [, subEnd] = subtreeRange(items, idx);
+          insertIdx = subEnd + 1;
+        }
+      }
+
+      const newItem = {
+        id, level, name: "New task",
+        owner: owner || "KE",
+        start: addDays(TODAY, 1),
+        end: addDays(TODAY, 8),
+        pct: 0,
+      };
+      const next = [...items];
+      next.splice(insertIdx, 0, newItem);
+      return next;
+    });
+    setFocusId(id);
+  }, [setFocusId]);
 
   // Add a dependency (toId depends on fromId), avoiding self/duplicate.
   const addDep = useCallback((fromId, toId) => {
@@ -1847,6 +1873,22 @@ function GanttGrid(props) {
                 <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>}
                 <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
 
+                {/* 행별 + 버튼 (hover 시 표시) */}
+                <span
+                  onClick={(e) => { e.stopPropagation(); addNewTask(r.id); }}
+                  title={`Level ${r.level} 태스크를 아래에 추가`}
+                  style={{
+                    opacity: isHover ? 1 : 0,
+                    pointerEvents: isHover ? "auto" : "none",
+                    transition: "opacity 120ms",
+                    width: 16, height: 16, flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 2, border: "1px solid var(--line-2)",
+                    color: "var(--accent)", fontSize: 13, cursor: "pointer",
+                    fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
+                    background: "var(--paper-2)", marginLeft: -2,
+                  }}>+</span>
+
               </div>);
 
           })}
@@ -1874,7 +1916,7 @@ function GanttGrid(props) {
 
           {/* + New task button */}
           <button
-            onClick={addNewTask}
+            onClick={() => addNewTask(focusId)}
             style={{
               display: "flex", alignItems: "center", gap: 8,
               width: "100%", border: "none", borderTop: "1px solid var(--line)",
@@ -1886,7 +1928,7 @@ function GanttGrid(props) {
             onMouseEnter={(e) => {e.currentTarget.style.background = "var(--paper-3)";e.currentTarget.style.color = "var(--ink)";}}
             onMouseLeave={(e) => {e.currentTarget.style.background = "transparent";e.currentTarget.style.color = "var(--ink-3)";}}>
             <span style={{ fontSize: 16, lineHeight: 1, color: "var(--accent)" }}>+</span>
-            <span>New task</span>
+            <span>New task{focusId ? ` (Lv ${(rows.find(r => r.id === focusId) || {}).level || ""})` : ""}</span>
           </button>
         </div>
       </div>
