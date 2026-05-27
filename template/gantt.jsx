@@ -2361,7 +2361,7 @@ function TeamModal({ owners, teams, onSave, onClose }) {
                   onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>✕</span>
               </div>
               {/* Column headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, padding: "0 0 4px", borderBottom: "1px solid var(--line)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, padding: "0 0 5px", borderBottom: "1px solid var(--line-2)" }}>
                 {["", "ID", "이름", "직무", ""].map((h, i) => (
                   <span key={i} className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em" }}>{h}</span>
                 ))}
@@ -2370,7 +2370,7 @@ function TeamModal({ owners, teams, onSave, onClose }) {
               {team.members.filter((m) => eo[m]).map((id) => {
                 const o = eo[id];
                 return (
-                  <div key={id} style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
+                  <div key={id} style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, alignItems: "center", padding: "5px 0" }}>
                     <span style={{ width: 22, height: 22, borderRadius: "50%", background: o.tint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "var(--paper)", flexShrink: 0, fontFamily: "IBM Plex Mono, monospace" }}>{id.slice(0, 2)}</span>
                     <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{id}</span>
                     <input value={o.name} onChange={(e) => updOwner(id, { name: e.target.value })} placeholder="이름" style={{ ...inputStyle, fontSize: 13 }} />
