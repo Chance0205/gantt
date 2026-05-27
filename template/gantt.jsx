@@ -553,7 +553,8 @@ function App() {
         const idx = items.findIndex((it) => it.id === refId);
         if (idx >= 0) {
           const row = items[idx];
-          level = row.level;
+          // 한 단계 하위 계층으로 생성 (level 3이면 3 유지)
+          level = Math.min(row.level + 1, 3);
           // owner: 현재 행 → 없으면 가장 가까운 이전 leaf
           owner = row.owner || owner;
           if (!owner || !OWNERS[owner]) {
@@ -818,7 +819,7 @@ function App() {
         for (let i = restInsertIdx - 1; i >= 0; i--) {
           if (rest[i].level < dLevel) {parent = rest[i];break;}
         }
-        valid = !!parent && parent.level === dLevel - 1;
+        valid = !!parent && parent.level < dLevel;
       }
 
       setRowDrag((cur) => cur ? {
