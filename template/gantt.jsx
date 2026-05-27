@@ -344,6 +344,9 @@ function downloadJSON(items, collapsed, meta) {
 //                           APP
 // ====================================================================
 function App() {
+  // ?view 파라미터가 있으면 뷰어 모드 (리셋·팀편집·임포트 숨김)
+  const isAdmin = !new URLSearchParams(window.location.search).has("view");
+
   const [v, setTweak] = window.useTweaks ? window.useTweaks({
     accent: "#8a3a1f",
     zoom: "month1",
@@ -1012,7 +1015,7 @@ function App() {
     <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
     <div>
       <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-      <Toolbar v={v} zoom={zoom} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
+      <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
       <div style={{
         background: "var(--paper-2)",
         border: "1px solid var(--line)",
@@ -1058,7 +1061,7 @@ function App() {
           deleteSegment={deleteSegment} />
 
       </div>
-      <Footer />
+      <Footer enriched={enriched} />
       {showTeamModal && <TeamModal owners={owners} teams={teams} onSave={updateTeamData} onClose={() => setShowTeamModal(false)} />}
       {ctxMenu && (
         <React.Fragment>
@@ -1220,7 +1223,7 @@ function SaveIndicator({ status }) {
   );
 }
 
-function Toolbar({ v, zoom, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
+function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
   const fileRef = useRef(null);
   return (
     <div style={{
@@ -1231,17 +1234,19 @@ function Toolbar({ v, zoom, setTweak, onExport, onImport, onReset, saveStatus, o
       <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
       <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
       <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-        <SaveIndicator status={saveStatus} />
+        {isAdmin && <SaveIndicator status={saveStatus} />}
         <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
-        <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
-        <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImport(f); e.target.value = ""; }} />
-        <ToolbarBtn onClick={onTeam} title="팀원 목록 편집">👥 Team</ToolbarBtn>
-        <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
-        <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
-        <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
-        <ToolbarBtn onClick={onReset} title="Discard changes and restore initial WBS" danger>↻ Reset</ToolbarBtn>
+        {isAdmin && <>
+          <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
+          <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImport(f); e.target.value = ""; }} />
+          <ToolbarBtn onClick={onTeam} title="팀원 목록 편집">👥 Team</ToolbarBtn>
+          <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
+          <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
+          <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
+          <ToolbarBtn onClick={onReset} title="Discard changes and restore initial WBS" danger>↻ Reset</ToolbarBtn>
+        </>}
       </div>
     </div>);
 
@@ -2808,8 +2813,18 @@ function TeamModal({ owners, teams, onSave, onClose }) {
   );
 }
 
-function Footer() {
+function Footer({ enriched }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
+
+  // 지연 태스크: 마감 지났는데 미완료인 leaf 태스크, 지연일 많은 순 정렬
+  const overdue = useMemo(() => {
+    if (!enriched) return [];
+    return enriched
+      .filter((r) => !r.isSummary && r.pct < 100 && r.end && r.end < TODAY)
+      .map((r) => ({ ...r, overdueDays: dayDiff(r.end, TODAY) }))
+      .sort((a, b) => b.overdueDays - a.overdueDays);
+  }, [enriched]);
+
   return (
     <footer style={{ marginTop: 32, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
       <div>
@@ -2867,16 +2882,40 @@ function Footer() {
         </div>
       </div>
 
+      {/* 지연 태스크 */}
       <div>
-        <div className="mono small-caps" style={{ color: "var(--ink-3)", marginBottom: 8 }}>Critical dates</div>
-        <ul style={{ margin: 0, padding: 0, listStyle: "none", fontSize: 12.5, color: "var(--ink-2)" }}>
-          {PROJECT_CONFIG.criticalDates.map((cd, i) => (
-            <li key={i} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: i < PROJECT_CONFIG.criticalDates.length - 1 ? "1px dashed var(--line-2)" : "none" }}>
-              <span>{cd.label}</span>
-              <span className="mono" style={{ color: cd.accent ? "var(--accent)" : "inherit" }}>{cd.date}</span>
-            </li>
-          ))}
-        </ul>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+          <div className="mono small-caps" style={{ color: "var(--ink-3)" }}>Overdue</div>
+          {overdue.length > 0 && (
+            <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10, color: "var(--paper)", background: "var(--accent)", borderRadius: 99, padding: "1px 6px", letterSpacing: 0.4 }}>
+              {overdue.length}
+            </span>
+          )}
+        </div>
+        {overdue.length === 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ink-4)", fontSize: 12 }}>
+            <span style={{ fontSize: 14 }}>✓</span>
+            <span className="mono" style={{ letterSpacing: 0.3 }}>All tasks on schedule</span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {overdue.map((r, i) => {
+              const rootColor = rootInfo(r.code || "").color;
+              return (
+                <div key={r.id} style={{
+                  display: "grid", gridTemplateColumns: "auto 1fr auto",
+                  gap: "0 10px", alignItems: "center",
+                  padding: "5px 0",
+                  borderBottom: i < overdue.length - 1 ? "1px dashed var(--line-2)" : "none"
+                }}>
+                  <span className="mono" style={{ fontSize: 10, color: rootColor, fontWeight: 700, letterSpacing: 0.3 }}>{r.code}</span>
+                  <span style={{ fontSize: 12, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                  <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>+{r.overdueDays}d</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </footer>);
 
