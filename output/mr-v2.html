@@ -1531,8 +1531,16 @@ function App() {
     return { total, done, inflight, overall, summaries: enriched.length - total };
   }, [enriched]);
 
+  const ownerTaskCounts = useMemo(() => {
+    const map = {};
+    enriched.filter((r) => !r.isSummary).forEach((r) => {
+      (r.owners || []).forEach((id) => { map[id] = (map[id] || 0) + 1; });
+    });
+    return map;
+  }, [enriched]);
+
   return (
-    <OwnersCtx.Provider value={{ owners, teams }}>
+    <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
     <div>
       <Masthead stats={stats} meta={meta} updateMeta={updateMeta} />
       <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
@@ -1764,7 +1772,7 @@ function ToolbarBtn({ onClick, title, danger, children }) {
 }
 
 function OwnerFilter({ value, onChange }) {
-  const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
+  const { owners: ctxOwners, teams: ctxTeams, ownerTaskCounts, totalLeaves } = React.useContext(OwnersCtx);
   const owningTeam = ctxTeams.find((t) => t.id === value || t.members.includes(value));
   const [expanded, setExpanded] = useState(owningTeam ? owningTeam.id : null);
   const isActive = (k) => k === value;
@@ -1817,19 +1825,27 @@ function OwnerFilter({ value, onChange }) {
                 const o = ctxOwners[mid];
                 if (!o) return null;
                 const memberActive = isActive(mid);
+                const cnt = ownerTaskCounts?.[mid] || 0;
+                const pct = totalLeaves > 0 ? Math.round(cnt / totalLeaves * 100) : 0;
                 return (
                   <button key={mid} onClick={() => onChange(mid)} style={{
                     ...baseBtn,
                     background: memberActive ? "var(--ink)" : "var(--paper-2)",
                     color: memberActive ? "var(--paper)" : "var(--ink-2)",
                     borderLeft: "1px solid var(--line-2)",
-                    fontSize: 11.5
+                    fontSize: 11.5,
                   }}>
                     <span style={{
-                      width: 6, height: 6, borderRadius: 99,
+                      width: 6, height: 6, borderRadius: 99, flexShrink: 0,
                       background: memberActive ? "var(--paper)" : o.tint
                     }} />
                     {o.name}
+                    <span style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: "auto", paddingLeft: 8 }}>
+                      <span style={{ width: 32, height: 3, background: memberActive ? "rgba(255,255,255,0.25)" : "var(--line-2)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
+                        <span style={{ display: "block", width: `${pct}%`, height: "100%", background: memberActive ? "var(--paper)" : o.tint, borderRadius: 2 }} />
+                      </span>
+                      <span className="mono" style={{ fontSize: 9.5, minWidth: 26, color: memberActive ? "rgba(255,255,255,0.65)" : "var(--ink-4)", textAlign: "right" }}>{pct}%</span>
+                    </span>
                   </button>);
 
               })}
