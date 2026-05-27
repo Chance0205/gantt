@@ -2783,13 +2783,45 @@ function OwnersPicker({ values, onChange }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
 
+  const allMembers = ctxTeams.flatMap((t) => t.members).filter((m) => ctxOwners[m]);
+
   const toggle = (id) => {
     if (values.includes(id)) onChange(values.filter((x) => x !== id));
     else onChange([...values, id]);
   };
 
+  const toggleTeam = (team) => {
+    const valid = team.members.filter((m) => ctxOwners[m]);
+    const allSel = valid.every((m) => values.includes(m));
+    if (allSel) onChange(values.filter((v) => !valid.includes(v)));
+    else { const s = new Set(values); valid.forEach((m) => s.add(m)); onChange([...s]); }
+  };
+
+  const toggleAll = () => {
+    const allSel = allMembers.every((m) => values.includes(m));
+    if (allSel) onChange([]);
+    else onChange([...allMembers]);
+  };
+
   const visible = values.slice(0, 3);
   const extra = values.length - 3;
+
+  const teamState = (team) => {
+    const valid = team.members.filter((m) => ctxOwners[m]);
+    const cnt = valid.filter((m) => values.includes(m)).length;
+    return cnt === valid.length && cnt > 0 ? "all" : cnt > 0 ? "some" : "none";
+  };
+  const allState = allMembers.every((m) => values.includes(m)) && allMembers.length > 0 ? "all"
+    : allMembers.some((m) => values.includes(m)) ? "some" : "none";
+
+  const groupBtnStyle = (state) => ({
+    display: "flex", alignItems: "center", gap: 6, width: "100%",
+    padding: "5px 8px", border: "none", borderRadius: 2, cursor: "pointer",
+    fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.04em",
+    textTransform: "uppercase", textAlign: "left",
+    background: state !== "none" ? "rgba(138,58,31,0.10)" : "transparent",
+    color: state !== "none" ? "var(--accent)" : "var(--ink-3)",
+  });
 
   return (
     <span
@@ -2824,43 +2856,60 @@ function OwnersPicker({ values, onChange }) {
               position: "absolute", top: "100%", right: 0, marginTop: 4,
               background: "var(--paper-2)", border: "1px solid var(--line)",
               borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
-              zIndex: 100, padding: 4, minWidth: 200, maxHeight: 320, overflowY: "auto",
+              zIndex: 100, padding: 4, minWidth: 210, maxHeight: 340, overflowY: "auto",
             }}>
-            {ctxTeams.map((team) => (
-              <React.Fragment key={team.id}>
-                <div className="mono small-caps" style={{
-                  fontSize: 9.5, color: "var(--ink-4)", padding: "6px 8px 2px",
-                  letterSpacing: 0.5, display: "flex", justifyContent: "space-between"
-                }}>
-                  <span>{team.name}</span>
-                  <span>{team.members.length}</span>
-                </div>
-                {team.members.map((k) => {
-                  const o2 = ctxOwners[k];
-                  if (!o2) return null;
-                  const active = values.includes(k);
-                  return (
-                    <button key={k}
-                      onClick={() => toggle(k)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 8, width: "100%",
-                        padding: "5px 8px", border: "none",
-                        background: active ? "rgba(138,58,31,0.10)" : "transparent",
-                        color: "var(--ink-2)",
-                        fontFamily: "inherit", fontSize: 12,
-                        cursor: "pointer", borderRadius: 2, textAlign: "left",
-                      }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--paper-3)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = active ? "rgba(138,58,31,0.10)" : "transparent"; }}>
-                      <Avatar owner={o2} initials={k} />
-                      <span>{o2.name}</span>
-                      <span className="mono" style={{ marginLeft: "auto", color: "var(--ink-4)", fontSize: 10 }}>{o2.role}</span>
-                      {active && <span style={{ color: "var(--accent)", fontSize: 11, lineHeight: 1 }}>✓</span>}
-                    </button>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+
+            {/* ALL row */}
+            <button onClick={toggleAll} style={groupBtnStyle(allState)}
+              onMouseEnter={(e) => { if (allState === "none") e.currentTarget.style.background = "var(--paper-3)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = allState !== "none" ? "rgba(138,58,31,0.10)" : "transparent"; }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", background: allState !== "none" ? "var(--accent)" : "var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "var(--paper)", flexShrink: 0 }}>ALL</span>
+              <span>전체</span>
+              {allState === "all" && <span style={{ marginLeft: "auto" }}>✓</span>}
+              {allState === "some" && <span style={{ marginLeft: "auto", opacity: 0.5 }}>—</span>}
+            </button>
+
+            <div style={{ height: 1, background: "var(--line)", margin: "4px 4px" }} />
+
+            {ctxTeams.map((team) => {
+              const ts = teamState(team);
+              return (
+                <React.Fragment key={team.id}>
+                  <button onClick={() => toggleTeam(team)} style={groupBtnStyle(ts)}
+                    onMouseEnter={(e) => { if (ts === "none") e.currentTarget.style.background = "var(--paper-3)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = ts !== "none" ? "rgba(138,58,31,0.10)" : "transparent"; }}>
+                    <span style={{ width: 22, height: 14, borderRadius: 2, background: ts !== "none" ? "var(--accent)" : "var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "var(--paper)", flexShrink: 0 }}>{team.name}</span>
+                    <span>{team.name}</span>
+                    <span className="mono" style={{ marginLeft: "auto", fontSize: 9, opacity: 0.5 }}>{team.members.filter(m => ctxOwners[m]).length}</span>
+                    {ts === "all" && <span>✓</span>}
+                    {ts === "some" && <span style={{ opacity: 0.5 }}>—</span>}
+                  </button>
+                  {team.members.map((k) => {
+                    const o2 = ctxOwners[k];
+                    if (!o2) return null;
+                    const active = values.includes(k);
+                    return (
+                      <button key={k}
+                        onClick={() => toggle(k)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, width: "100%",
+                          padding: "4px 8px 4px 22px", border: "none",
+                          background: active ? "rgba(138,58,31,0.10)" : "transparent",
+                          color: "var(--ink-2)", fontFamily: "inherit", fontSize: 12,
+                          cursor: "pointer", borderRadius: 2, textAlign: "left",
+                        }}
+                        onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--paper-3)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = active ? "rgba(138,58,31,0.10)" : "transparent"; }}>
+                        <Avatar owner={o2} initials={k} />
+                        <span>{o2.name}</span>
+                        <span className="mono" style={{ marginLeft: "auto", color: "var(--ink-4)", fontSize: 10 }}>{o2.role}</span>
+                        {active && <span style={{ color: "var(--accent)", fontSize: 11, lineHeight: 1 }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </React.Fragment>
+              );
+            })}
           </div>
         </React.Fragment>
       )}
