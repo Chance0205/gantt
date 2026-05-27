@@ -600,7 +600,9 @@ function App() {
   }, [visibleRows]);
 
   const timelineW = viewTotalDays * dayW;
-  const todayX = dayDiff(viewStart, TODAY) * dayW;
+  // TODAY를 자정으로 정규화 후 floor — 시간 성분으로 인한 반올림 오류 방지
+  const todayMidnight = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const todayX = Math.floor((todayMidnight - viewStart) / DAY) * dayW;
 
   const [hover, setHover] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -1938,10 +1940,24 @@ function GanttGrid(props) {
               position: "absolute", top: 0, left: todayX, width: 1, height: totalRowsHeight,
               background: "var(--accent)", pointerEvents: "none"
             }}>
+              {/* 다이아몬드 */}
               <div style={{
                 position: "absolute", top: -6, left: -4, width: 9, height: 9,
                 background: "var(--accent)", transform: "rotate(45deg)"
               }} />
+              {/* month12 줌: 다이아몬드 위에 날짜 레이블 */}
+              {zoomLevel === "month12" && (
+                <div style={{
+                  position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)",
+                  background: "var(--accent)", color: "var(--paper)",
+                  fontFamily: "IBM Plex Mono, monospace", fontSize: 9, fontWeight: 600,
+                  padding: "2px 5px", borderRadius: 2, whiteSpace: "nowrap", letterSpacing: 0.4,
+                  lineHeight: 1.4
+                }}>
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][TODAY.getDay()]}
+                  {" "}{TODAY.getMonth() + 1}/{TODAY.getDate()}
+                </div>
+              )}
             </div>
 
             {/* BARS */}
