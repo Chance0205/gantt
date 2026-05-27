@@ -2527,6 +2527,14 @@ function TeamModal({ owners, teams, onSave, onClose }) {
 
   const updOwner = (id, patch) => setEo((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
+  const renameOwner = (oldId, newId) => {
+    newId = newId.trim();
+    if (!newId || newId === oldId) return;
+    if (eo[newId]) return; // 중복 ID — 무시
+    setEo((prev) => { const n = { ...prev, [newId]: { ...prev[oldId] } }; delete n[oldId]; return n; });
+    setEt((prev) => prev.map((t) => ({ ...t, members: t.members.map((m) => m === oldId ? newId : m) })));
+  };
+
   const delOwner = (id) => {
     setEo((prev) => { const n = { ...prev }; delete n[id]; return n; });
     setEt((prev) => prev.map((t) => ({ ...t, members: t.members.filter((m) => m !== id) })));
@@ -2615,7 +2623,16 @@ function TeamModal({ owners, teams, onSave, onClose }) {
                 return (
                   <div key={id} style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, alignItems: "center", padding: "5px 0" }}>
                     <span style={{ width: 22, height: 22, borderRadius: "50%", background: o.tint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "var(--paper)", flexShrink: 0, fontFamily: "IBM Plex Mono, monospace" }}>{id.slice(0, 2)}</span>
-                    <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{id}</span>
+                    <input
+                      defaultValue={id}
+                      onFocus={(e) => e.target.select()}
+                      onBlur={(e) => renameOwner(id, e.target.value)}
+                      style={{ fontSize: 10, fontFamily: "IBM Plex Mono, monospace", color: "var(--ink-3)", background: "transparent", border: "none", borderBottom: "1px solid transparent", outline: "none", width: "100%", padding: "1px 0" }}
+                      onMouseEnter={(e) => e.target.style.borderBottomColor = "var(--line-2)"}
+                      onMouseLeave={(e) => { if (document.activeElement !== e.target) e.target.style.borderBottomColor = "transparent"; }}
+                      onFocusCapture={(e) => e.target.style.borderBottomColor = "var(--accent)"}
+                      onBlurCapture={(e) => e.target.style.borderBottomColor = "transparent"}
+                    />
                     <input value={o.name} onChange={(e) => updOwner(id, { name: e.target.value })} placeholder="이름" style={{ ...inputStyle, fontSize: 13 }} />
                     <input value={o.role} onChange={(e) => updOwner(id, { role: e.target.value })} placeholder="직무" style={{ ...inputStyle, fontSize: 11, fontFamily: "IBM Plex Mono, monospace", color: "var(--ink-3)" }} />
                     <span onClick={() => delOwner(id)} style={{ cursor: "pointer", color: "var(--ink-4)", fontSize: 11, textAlign: "center", borderRadius: 2, lineHeight: "22px" }}
