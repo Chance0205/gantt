@@ -831,6 +831,46 @@ function App() {
 // ====================================================================
 //                           MASTHEAD / TOOLBAR
 // ====================================================================
+// 마스트헤드 전용 인라인 편집 필드 (클릭 한 번으로 편집)
+function MetaField({ value, onCommit, textStyle, inputStyle }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value);
+  useEffect(() => { setVal(value); }, [value]);
+
+  const commit = () => {
+    setEditing(false);
+    const v = (val || "").trim();
+    if (v && v !== value) onCommit(v);
+    else setVal(value);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="text"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { setVal(value); setEditing(false); }
+        }}
+        style={{ ...textStyle, ...inputStyle, border: "none", borderBottom: "2px solid var(--accent)", background: "transparent", outline: "none", padding: 0, margin: 0, width: "100%", minWidth: 80 }}
+      />
+    );
+  }
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      title="클릭해서 편집"
+      style={{ ...textStyle, cursor: "text", borderBottom: "1px dashed transparent", transition: "border-color 120ms" }}
+      onMouseEnter={(e) => e.currentTarget.style.borderBottomColor = "var(--accent)"}
+      onMouseLeave={(e) => e.currentTarget.style.borderBottomColor = "transparent"}
+    >{value}</span>
+  );
+}
+
 function Masthead({ stats, meta, updateMeta }) {
   return (
     <header style={{ marginBottom: 24 }}>
@@ -841,20 +881,20 @@ function Masthead({ stats, meta, updateMeta }) {
             {`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][TODAY.getDay()]}, ${monthName(TODAY.getMonth())} ${TODAY.getDate()}, ${TODAY.getFullYear()}`}
           </span>
         </div>
-        <EditableText value={meta.headerRight} onCommit={(v) => updateMeta({ headerRight: v })}
-          style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--ink-3)" }} />
+        <MetaField value={meta.headerRight} onCommit={(v) => updateMeta({ headerRight: v })}
+          textStyle={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--ink-3)" }} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "end", marginTop: 16, gap: 24 }}>
         <div>
-          <EditableText value={meta.subtitle} onCommit={(v) => updateMeta({ subtitle: v })}
-            style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--accent)", marginBottom: 6, display: "block" }} />
+          <MetaField value={meta.subtitle} onCommit={(v) => updateMeta({ subtitle: v })}
+            textStyle={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--accent)", display: "block", marginBottom: 6 }} />
           <h1 className="serif" style={{ fontSize: 56, lineHeight: 1.0, margin: 0, letterSpacing: "-0.02em", color: "var(--ink)", display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-            <EditableText value={meta.wbsPrefix} onCommit={(v) => updateMeta({ wbsPrefix: v })}
-              style={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
+            <MetaField value={meta.wbsPrefix} onCommit={(v) => updateMeta({ wbsPrefix: v })}
+              textStyle={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
             <span style={{ fontStyle: "italic", color: "var(--accent)" }}>—</span>
-            <EditableText value={meta.wbsSuffix} onCommit={(v) => updateMeta({ wbsSuffix: v })}
-              style={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
+            <MetaField value={meta.wbsSuffix} onCommit={(v) => updateMeta({ wbsSuffix: v })}
+              textStyle={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
           </h1>
         </div>
 
