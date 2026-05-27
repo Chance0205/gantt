@@ -770,14 +770,23 @@ function hasChildrenAfter(items, idx) {
 
 // Translate a visible-list gap index → items array insertion index.
 // Gap g means "insert before visibleRows[g]" (or at end if g === visibleRows.length).
-// The corresponding items index is: end of previous row's subtree + 1.
 function visibleGapToItemsIndex(items, visibleRows, gIdx) {
   if (gIdx <= 0) return 0;
-  if (gIdx > visibleRows.length) gIdx = visibleRows.length;
+  if (gIdx >= visibleRows.length) return items.length;
+
   const prev = visibleRows[gIdx - 1];
-  if (!prev) return items.length;
+  const next = visibleRows[gIdx];
+
   const prevItemsIdx = items.findIndex((it) => it.id === prev.id);
   if (prevItemsIdx < 0) return items.length;
+
+  // next가 prev의 자식(더 깊은 level)이면 next 바로 앞에 삽입.
+  // 그렇지 않으면 prev의 subtree 전체(collapsed된 숨겨진 항목 포함) 뒤에 삽입.
+  if (next && next.level > prev.level) {
+    const nextItemsIdx = items.findIndex((it) => it.id === next.id);
+    if (nextItemsIdx >= 0) return nextItemsIdx;
+  }
+
   const [, end] = subtreeRange(items, prevItemsIdx);
   return end + 1;
 }
