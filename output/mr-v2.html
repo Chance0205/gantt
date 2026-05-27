@@ -972,9 +972,11 @@ function App() {
   const dayW = zoom === "month1" ? 24 : 5;
   const rowH = 30;
 
+  const parseLocalDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+
   // 편집 가능한 프로젝트 기간 (meta에서 읽기, 없으면 CONFIG 기본값)
-  const projStart = meta.projectStart ? new Date(meta.projectStart) : PROJECT_START;
-  const projEnd   = meta.projectEnd   ? new Date(meta.projectEnd)   : PROJECT_END;
+  const projStart = meta.projectStart ? parseLocalDate(meta.projectStart) : PROJECT_START;
+  const projEnd   = meta.projectEnd   ? parseLocalDate(meta.projectEnd)   : PROJECT_END;
 
   // Visible timeline range: 전체 프로젝트 기간을 항상 표시.
   const viewStart = zoom === "month12" ? new Date(projStart.getFullYear(), 0, 1) : projStart;
@@ -1158,7 +1160,8 @@ function App() {
 
   const timelineW = viewTotalDays * dayW;
   const todayMidnight = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  const todayX = Math.floor((todayMidnight - viewStart) / DAY) * dayW;
+  const todayDayIdx = Math.round((todayMidnight - viewStart) / DAY);
+  const todayX = todayDayIdx * dayW + (zoom === "month1" ? Math.floor(dayW / 2) : 0);
 
   const [hover, setHover] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -2273,7 +2276,7 @@ function GanttGrid(props) {
               }) :
               /* month1: 일 단위 셀, 주말 붉은 배경 */
               days.map((dt, i) => {
-                const isToday = dt.getTime() === TODAY.getTime();
+                const isToday = dt.getDate() === TODAY.getDate() && dt.getMonth() === TODAY.getMonth() && dt.getFullYear() === TODAY.getFullYear();
                 const isFirstOfMonth = dt.getDate() === 1;
                 const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                 return (

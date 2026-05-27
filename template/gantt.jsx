@@ -413,9 +413,13 @@ function App() {
   const dayW = zoom === "month1" ? 24 : 5;
   const rowH = 30;
 
+  // ISO 문자열("2026-04-06")을 로컬 자정으로 파싱
+  // new Date("2026-04-06")는 UTC 자정이라 타임존 오프셋만큼 틀어짐 → 수동 파싱
+  const parseLocalDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+
   // 편집 가능한 프로젝트 기간 (meta에서 읽기, 없으면 CONFIG 기본값)
-  const projStart = meta.projectStart ? new Date(meta.projectStart) : PROJECT_START;
-  const projEnd   = meta.projectEnd   ? new Date(meta.projectEnd)   : PROJECT_END;
+  const projStart = meta.projectStart ? parseLocalDate(meta.projectStart) : PROJECT_START;
+  const projEnd   = meta.projectEnd   ? parseLocalDate(meta.projectEnd)   : PROJECT_END;
 
   // Visible timeline range: 전체 프로젝트 기간을 항상 표시.
   // month12: 프로젝트를 포함하는 전체 연도(들)를 표시
@@ -600,9 +604,11 @@ function App() {
   }, [visibleRows]);
 
   const timelineW = viewTotalDays * dayW;
-  // TODAY를 자정으로 정규화 후 floor — 시간 성분으로 인한 반올림 오류 방지
+  // TODAY를 자정으로 정규화 — 시간 성분으로 인한 오류 방지
   const todayMidnight = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  const todayX = Math.floor((todayMidnight - viewStart) / DAY) * dayW;
+  const todayDayIdx = Math.round((todayMidnight - viewStart) / DAY); // viewStart도 로컬 자정이므로 정확
+  // Day 줌: 컬럼 중앙(+dayW/2)에 선을 그려야 날짜 숫자와 정렬됨
+  const todayX = todayDayIdx * dayW + (zoom === "month1" ? Math.floor(dayW / 2) : 0);
 
   const [hover, setHover] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -1728,7 +1734,7 @@ function GanttGrid(props) {
               }) :
               /* month1: 일 단위 셀, 주말 붉은 배경 */
               days.map((dt, i) => {
-                const isToday = dt.getTime() === TODAY.getTime();
+                const isToday = dt.getDate() === TODAY.getDate() && dt.getMonth() === TODAY.getMonth() && dt.getFullYear() === TODAY.getFullYear();
                 const isFirstOfMonth = dt.getDate() === 1;
                 const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                 return (
