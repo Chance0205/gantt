@@ -1,0 +1,64 @@
+/* Gantt — editorial planner aesthetic */
+
+:root {
+  --paper:   #f4ede0;
+  --paper-2: #efe6d4;
+  --paper-3: #e8ddc6;
+  --ink:     #1c1916;
+  --ink-2:   #3a342d;
+  --ink-3:   #6b6358;
+  --ink-4:   #9a907f;
+  --line:    #d8cdb4;
+  --line-2:  #c4b89c;
+  --accent:   #8a3a1f;       /* sepia-brick — matches the napkin */
+  --accent-2: #b8612e;
+  --clay:  #c89a6e;
+  --olive: #6e7a3a;
+  --slate: #46555f;
+  --rose:  #a05a55;
+  --plum:  #6a4458;
+  --ok:    #4f6b3d;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+  background-image: radial-gradient(circle at 1px 1px, rgba(28,25,22,0.05) 1px, transparent 0);
+  background-size: 22px 22px;
+  background-position: 0 0;
+}
+
+.serif {
+  font-family: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.small-caps {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+#root {
+  padding: 36px 44px 56px;
+  max-width: 1480px;
+  margin: 0 auto;
+}

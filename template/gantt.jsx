@@ -1,15 +1,16 @@
-// Gantt — WBS-driven, fully editable. Project data lives in PROJECT_CONFIG below.
+// Gantt — WBS-driven, fully editable.
+// 데이터는 window.__GANTT_DATA__ (외부 data.js)에서 우선 로드,
+// 없으면 아래 내장 기본값 사용.
 const { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } = React;
 
 // ================================================================
-// ▼▼▼  PROJECT CONFIGURATION — 새 프로젝트는 여기만 수정  ▼▼▼
+// ▼▼▼  내장 기본 데이터 — 외부 data.js 없을 때만 사용됨  ▼▼▼
+//       (data.js 사용 시 이 블록은 무시됩니다)
 // ================================================================
-
-// 날짜 헬퍼 (year를 바꾸면 모든 태스크 날짜가 이동)
-const _Y = 2026;
-const _d = (m, day) => new Date(_Y, m - 1, day);
-
-const PROJECT_CONFIG = {
+const PROJECT_CONFIG = window.__GANTT_DATA__ || (function() {
+  const _Y = 2026;
+  const _d = (m, day) => new Date(_Y, m - 1, day);
+  return {
   // ── 제목 ──────────────────────────────────────────────────────
   pageTitle:   "Micro Restaurant V2 — Build Schedule",
   headerRight: "Build Schedule · Hardware Ops",
@@ -122,11 +123,11 @@ const PROJECT_CONFIG = {
     { label: "Cooking 모듈 조립 시작", date: "Jun 19", accent: true  },
     { label: "모듈 테스트 완료",       date: "Jul 17", accent: true  },
   ],
-};
+  };
+})();
 
 // ================================================================
-// ▲▲▲  여기까지가 설정 영역  ▲▲▲
-// ── 아래는 수정 불필요 (엔진 코드) ──────────────────────────────
+// ── 엔진 코드 (수정 불필요) ─────────────────────────────────────
 // ================================================================
 
 const PROJECT_START = PROJECT_CONFIG.projectStart;
