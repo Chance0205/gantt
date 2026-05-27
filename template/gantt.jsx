@@ -576,53 +576,31 @@ function App() {
     setItems((items) => {
       // afterId 없으면 → 최상위(level 1)로 맨 끝에 추가
       if (!afterId) {
-        const newItem = {
-          id, level: 1, name: "New task",
-          owner: "KE",
-          start: addDays(TODAY, 1),
-          end: addDays(TODAY, 8),
-          pct: 0,
-        };
-        return [...items, newItem];
+        return [...items, {
+          id, level: 1, name: "New task", owner: "KE",
+          start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
+        }];
       }
 
-      let insertIdx = items.length;
-      let level = 1;
-      let owner = "KE";
+      const idx = items.findIndex((it) => it.id === afterId);
+      if (idx < 0) return items;
 
-      const refId = afterId;
-      if (refId) {
-        const idx = items.findIndex((it) => it.id === refId);
-        if (idx >= 0) {
-          const row = items[idx];
-          // 한 단계 하위 계층으로 생성 (level 3이면 3 유지)
-          level = Math.min(row.level + 1, 3);
-          // owner: 현재 행 → 없으면 가장 가까운 이전 leaf
-          owner = row.owner || owner;
-          if (!owner || !OWNERS[owner]) {
-            for (let k = idx - 1; k >= 0; k--) {
-              if (items[k].owner && OWNERS[items[k].owner]) { owner = items[k].owner; break; }
-            }
-          }
-          // subtree 끝 다음에 삽입
-          const [, subEnd] = subtreeRange(items, idx);
-          insertIdx = subEnd + 1;
-        }
-      }
+      const row = items[idx];
+      const level = Math.min(row.level + 1, 3);
+      // summary(자식 있음)는 의미있는 owner가 없으므로 상속 안 함
+      const parentIsSummary = hasChildrenAfter(items, idx);
+      const owner = parentIsSummary ? undefined : (row.owner && owners[row.owner] ? row.owner : "KE");
 
-      const newItem = {
-        id, level, name: "New task",
-        owner: owner || "KE",
-        start: addDays(TODAY, 1),
-        end: addDays(TODAY, 8),
-        pct: 0,
-      };
+      const [, subEnd] = subtreeRange(items, idx);
       const next = [...items];
-      next.splice(insertIdx, 0, newItem);
+      next.splice(subEnd + 1, 0, {
+        id, level, name: "New task", owner,
+        start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
+      });
       return next;
     });
     setFocusId(id);
-  }, [setFocusId]);
+  }, [owners, setFocusId]);
 
   // Add a dependency (toId depends on fromId), avoiding self/duplicate.
   const addDep = useCallback((fromId, toId) => {
@@ -1309,7 +1287,6 @@ function GanttGrid(props) {
             const indent = (lvl - 1) * 14;
             const isHover = hover === r.id;
             const isFocus = focusId === r.id;
-            const o = !r.isSummary ? ctxOwners[r.owner] : null;
             const rootColor = colorFor(r.code);
             const isCollapsed = collapsed[r.id];
             return (
@@ -1385,9 +1362,9 @@ function GanttGrid(props) {
                   }
                 </div>
 
-                {o ?
-                <OwnerPicker value={r.owner} onChange={(v) => updateItem(r.id, { owner: v })} /> :
-                <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>}
+                {r.isSummary
+                  ? <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>
+                  : <OwnerPicker value={r.owner} onChange={(v) => updateItem(r.id, { owner: v })} />}
                 <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
 
                 {/* 행별 + / ✕ 버튼 — absolute 배치로 flex 레이아웃에 영향 없음 */}
@@ -2088,14 +2065,16 @@ function OwnerPicker({ value, onChange }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
   const o = ctxOwners[value];
-  if (!o) return null;
   return (
     <span
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); setOpen((x) => !x); }}
       style={{ position: "relative", display: "inline-flex", cursor: "pointer" }}
-      title="Click to change owner">
-      <Avatar owner={o} initials={value} />
+      title={o ? "Click to change owner" : "Click to assign owner"}>
+      {o
+        ? <Avatar owner={o} initials={value} />
+        : <span style={{ width: 22, height: 22, borderRadius: "50%", border: "1.5px dashed var(--ink-4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--ink-4)" }}>+</span>
+      }
       {open && (
         <React.Fragment>
           <div
