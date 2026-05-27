@@ -7,13 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-
-<!-- ① 스타일 (같은 폴더의 gantt.css) -->
 <link rel="stylesheet" href="gantt.css" />
 </head>
 <body>
   <div id="root"></div>
-
   <script type="application/json" id="__tweaks_defaults__">
     /*EDITMODE-BEGIN*/{
       "accent": "#8a3a1f",
@@ -22,16 +19,10 @@
       "owner": "all"
     }/*EDITMODE-END*/
   </script>
-
-  <!-- ② 프로젝트 데이터 (같은 폴더의 mr-v2-data.js) -->
   <script src="mr-v2-data.js"></script>
-
-  <!-- ③ React / Babel (CDN) -->
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-
-  <!-- ④ 트윅 패널 엔진 (인라인) -->
   <script type="text/babel">
 
 // tweaks-panel.jsx
@@ -563,10 +554,7 @@ Object.assign(window, {
   TweakSlider, TweakToggle, TweakRadio, TweakSelect,
   TweakText, TweakNumber, TweakColor, TweakButton,
 });
-  </script>
-
-  <!-- ⑤ 간트 차트 엔진 (인라인) — UI 업그레이드 시 이 블록만 교체 -->
-  <script type="text/babel">
+  </script><script type="text/babel">
 // Gantt — WBS-driven, fully editable.
 // 데이터는 window.__GANTT_DATA__ (외부 data.js)에서 우선 로드,
 // 없으면 아래 내장 기본값 사용.
@@ -829,6 +817,7 @@ function loadFromStorage() {
     return {
       items: deserializeItems(parsed.items),
       collapsed: parsed.collapsed || {},
+      meta: parsed.meta || null,
     };
   } catch (e) {
     console.warn("Gantt: failed to load saved state", e);
@@ -836,11 +825,12 @@ function loadFromStorage() {
   }
 }
 
-function saveToStorage(items, collapsed) {
+function saveToStorage(items, collapsed, meta) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       items: serializeItems(items),
       collapsed,
+      meta,
       _savedAt: new Date().toISOString(),
     }));
   } catch (e) {
@@ -853,10 +843,11 @@ function clearStorage() {
 }
 
 // Download items as a JSON file.
-function downloadJSON(items, collapsed) {
+function downloadJSON(items, collapsed, meta) {
   const data = {
     items: serializeItems(items),
     collapsed,
+    meta,
     exportedAt: new Date().toISOString(),
     version: 1,
   };
@@ -886,9 +877,23 @@ function App() {
     document.documentElement.style.setProperty("--accent", v.accent);
   }, [v.accent]);
 
-  useEffect(() => {
-    document.title = PROJECT_CONFIG.pageTitle;
+  // ------- project meta (title fields, persisted) -------
+  const [meta, setMetaState] = useState(() => {
+    const saved = loadFromStorage();
+    return saved && saved.meta ? saved.meta : {
+      subtitle:    PROJECT_CONFIG.subtitle,
+      wbsPrefix:   PROJECT_CONFIG.wbsPrefix,
+      wbsSuffix:   PROJECT_CONFIG.wbsSuffix,
+      headerRight: PROJECT_CONFIG.headerRight,
+    };
+  });
+  const updateMeta = useCallback((patch) => {
+    setMetaState((m) => ({ ...m, ...patch }));
   }, []);
+
+  useEffect(() => {
+    document.title = `${meta.wbsPrefix} — ${meta.wbsSuffix}`;
+  }, [meta.wbsPrefix, meta.wbsSuffix]);
 
   // Map legacy keys (density/scale) so users who saved old settings still work.
   const zoom = v.zoom || (v.density === "spacious" ? "month1" : v.density === "comfortable" ? "month4" : "month4");
@@ -912,11 +917,11 @@ function App() {
     return (saved && saved.collapsed) || {};
   });
 
-  // Persist on every change. Debounce-y: synchronous setItem is plenty fast for this dataset.
-  useEffect(() => { saveToStorage(items, collapsed); }, [items, collapsed]);
+  // Persist on every change.
+  useEffect(() => { saveToStorage(items, collapsed, meta); }, [items, collapsed, meta]);
 
   // Export current state as a JSON file the user can keep.
-  const exportJSON = useCallback(() => downloadJSON(items, collapsed), [items, collapsed]);
+  const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta), [items, collapsed, meta]);
 
   // Import a JSON file the user picks; merge { items, collapsed }.
   const importJSON = useCallback((file) => {
@@ -929,6 +934,7 @@ function App() {
         if (!nextItems) throw new Error("invalid items");
         setItems(nextItems);
         setCollapsed(parsed.collapsed || {});
+        if (parsed.meta) setMetaState(parsed.meta);
       } catch (err) {
         alert("Could not parse JSON file: " + err.message);
       }
@@ -942,6 +948,12 @@ function App() {
     clearStorage();
     setItems(INITIAL_WBS);
     setCollapsed({});
+    setMetaState({
+      subtitle:    PROJECT_CONFIG.subtitle,
+      wbsPrefix:   PROJECT_CONFIG.wbsPrefix,
+      wbsSuffix:   PROJECT_CONFIG.wbsSuffix,
+      headerRight: PROJECT_CONFIG.headerRight,
+    });
   }, []);
 
   // Derive codes from current items
@@ -1324,7 +1336,7 @@ function App() {
 
   return (
     <div>
-      <Masthead stats={stats} />
+      <Masthead stats={stats} meta={meta} updateMeta={updateMeta} />
       <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} />
       <div style={{
         background: "var(--paper-2)",
@@ -1376,7 +1388,7 @@ function App() {
 // ====================================================================
 //                           MASTHEAD / TOOLBAR
 // ====================================================================
-function Masthead({ stats }) {
+function Masthead({ stats, meta, updateMeta }) {
   return (
     <header style={{ marginBottom: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid var(--ink)", paddingBottom: 14 }}>
@@ -1386,14 +1398,20 @@ function Masthead({ stats }) {
             {`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][TODAY.getDay()]}, ${monthName(TODAY.getMonth())} ${TODAY.getDate()}, ${TODAY.getFullYear()}`}
           </span>
         </div>
-        <span className="mono small-caps" style={{ color: "var(--ink-3)" }}>{PROJECT_CONFIG.headerRight}</span>
+        <EditableText value={meta.headerRight} onCommit={(v) => updateMeta({ headerRight: v })}
+          style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--ink-3)" }} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "end", marginTop: 16, gap: 24 }}>
         <div>
-          <div className="mono small-caps" style={{ color: "var(--accent)", marginBottom: 6 }}>{PROJECT_CONFIG.subtitle}</div>
-          <h1 className="serif" style={{ fontSize: 56, lineHeight: 1.0, margin: 0, letterSpacing: "-0.02em", color: "var(--ink)" }}>
-            {PROJECT_CONFIG.wbsPrefix} <span style={{ fontStyle: "italic", color: "var(--accent)" }}>—</span> {PROJECT_CONFIG.wbsSuffix}
+          <EditableText value={meta.subtitle} onCommit={(v) => updateMeta({ subtitle: v })}
+            style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--accent)", marginBottom: 6, display: "block" }} />
+          <h1 className="serif" style={{ fontSize: 56, lineHeight: 1.0, margin: 0, letterSpacing: "-0.02em", color: "var(--ink)", display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+            <EditableText value={meta.wbsPrefix} onCommit={(v) => updateMeta({ wbsPrefix: v })}
+              style={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
+            <span style={{ fontStyle: "italic", color: "var(--accent)" }}>—</span>
+            <EditableText value={meta.wbsSuffix} onCommit={(v) => updateMeta({ wbsSuffix: v })}
+              style={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
           </h1>
         </div>
 
