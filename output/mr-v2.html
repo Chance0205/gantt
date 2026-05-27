@@ -831,6 +831,10 @@ function deserializeItems(raw) {
     } else {
       item.segments = [{ start: item.start, end: item.end }];
     }
+    if (!Array.isArray(item.owners)) {
+      item.owners = item.owner ? [item.owner] : [];
+    }
+    if (item.notes === undefined) item.notes = "";
     return item;
   });
 }
@@ -964,9 +968,14 @@ function App() {
   const [items, setItems] = useState(() => {
     const saved = loadFromStorage();
     const rawItems = (saved && saved.items && saved.items.length) ? saved.items : INITIAL_WBS.map(it => ({ ...it }));
-    return rawItems.map(it =>
-      (it.segments && it.segments.length > 0) ? it : { ...it, segments: [{ start: it.start, end: it.end }] }
-    );
+    return rawItems.map(it => {
+      const base = (it.segments && it.segments.length > 0) ? it : { ...it, segments: [{ start: it.start, end: it.end }] };
+      return {
+        ...base,
+        owners: Array.isArray(base.owners) ? base.owners : (base.owner ? [base.owner] : []),
+        notes: base.notes || "",
+      };
+    });
   });
   const [collapsed, setCollapsed] = useState(() => {
     const saved = loadFromStorage();
@@ -1083,10 +1092,12 @@ function App() {
     let keepIds = new Set(enriched.map((r) => r.id));
     if (v.owner !== "all") {
       const team = TEAMS.find((t) => t.id === v.owner);
-      const matchOwner = team ? (o) => team.members.includes(o) : (o) => o === v.owner;
+      const matchOwner = team
+        ? (r) => (r.owners || []).some((o) => team.members.includes(o))
+        : (r) => (r.owners || []).includes(v.owner);
       keepIds = new Set();
       enriched.forEach((r, i) => {
-        if (!r.isSummary && matchOwner(r.owner)) {
+        if (!r.isSummary && matchOwner(r)) {
           keepIds.add(r.id);
           // add ancestors
           let lvl = r.level;
@@ -1198,8 +1209,9 @@ function App() {
     setItems((items) => {
       if (!afterId) {
         return [...items, {
-          id, level: 1, name: "New task", owner: "KE",
+          id, level: 1, name: "New task", owners: ["KE"],
           start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
+          segments: [{ start: addDays(TODAY, 1), end: addDays(TODAY, 8) }], notes: "",
         }];
       }
 
@@ -1209,13 +1221,14 @@ function App() {
       const row = items[idx];
       const level = Math.min(row.level + 1, 3);
       const parentIsSummary = hasChildrenAfter(items, idx);
-      const owner = parentIsSummary ? undefined : (row.owner && owners[row.owner] ? row.owner : "KE");
+      const ownerIds = parentIsSummary ? [] : ((row.owners || []).filter(o => owners[o]).length > 0 ? [...row.owners] : ["KE"]);
 
       const [, subEnd] = subtreeRange(items, idx);
       const next = [...items];
       next.splice(subEnd + 1, 0, {
-        id, level, name: "New task", owner,
+        id, level, name: "New task", owners: ownerIds,
         start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
+        segments: [{ start: addDays(TODAY, 1), end: addDays(TODAY, 8) }], notes: "",
       });
       return next;
     });
@@ -1908,6 +1921,7 @@ function GanttGrid(props) {
   } = props;
 
   const { owners: ctxOwners } = React.useContext(OwnersCtx);
+  const [detailId, setDetailId] = useState(null);
   const headerH = 56;
   const totalRowsHeight = rows.length * rowH;
 
@@ -2010,14 +2024,20 @@ function GanttGrid(props) {
                 <span style={{ width: 14 }} />
                 }
 
-                <span className="mono" style={{
-                  fontSize: 10.5,
-                  color: lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)",
-                  fontWeight: lvl <= 2 ? 600 : 400,
-                  minWidth: 36, letterSpacing: 0.3,
-                  borderLeft: `2px solid ${rootColor}`,
-                  paddingLeft: 6
-                }}>{r.code}</span>
+                <span className="mono"
+                  onClick={(e) => { e.stopPropagation(); setDetailId(r.id); }}
+                  style={{
+                    fontSize: 10.5,
+                    color: lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)",
+                    fontWeight: lvl <= 2 ? 600 : 400,
+                    minWidth: 36, letterSpacing: 0.3,
+                    borderLeft: `2px solid ${rootColor}`,
+                    paddingLeft: 6,
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)"}
+                >{r.code}</span>
 
                 <div
                   onClick={() => {
@@ -2047,7 +2067,7 @@ function GanttGrid(props) {
 
                 {r.isSummary
                   ? <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>
-                  : <OwnerPicker value={r.owner} onChange={(v) => updateItem(r.id, { owner: v })} />}
+                  : <OwnersPicker values={r.owners||[]} onChange={(vals) => updateItem(r.id, { owners: vals })} />}
                 <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
 
                 {/* 행별 + / ✕ 버튼 — absolute 배치로 flex 레이아웃에 영향 없음 */}
@@ -2422,6 +2442,10 @@ function GanttGrid(props) {
           </div>
         </div>
       </div>
+    {detailId && (() => {
+      const detailItem = rows.find((r) => r.id === detailId);
+      return detailItem ? <TaskDetailCard item={detailItem} onClose={() => setDetailId(null)} onSave={(notes) => updateItem(detailId, { notes })} /> : null;
+    })()}
     </div>);
 
 }
@@ -2531,7 +2555,7 @@ function LeafBar({ r, segIdx, totalSegs, isFirstSeg, isLastSeg, fillFraction,
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               width: 14, height: 14, borderRadius: 99, background: "rgba(0,0,0,0.35)",
               color: "var(--paper)", fontSize: 8.5, letterSpacing: 0.5, flexShrink: 0
-            }} className="mono">{r.owner}</span>
+            }} className="mono">{(r.owners || [])[0] || ""}</span>
             {w > 80 && <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>}
             {w > 160 && <span className="mono" style={{ marginLeft: "auto", fontSize: 10, opacity: 0.85 }}>{r.pct}%</span>}
           </React.Fragment>
@@ -2755,20 +2779,38 @@ function EditableText({ value, onCommit, style, multiline, suggestions }) {
   );
 }
 
-function OwnerPicker({ value, onChange }) {
+function OwnersPicker({ values, onChange }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
-  const o = ctxOwners[value];
+
+  const toggle = (id) => {
+    if (values.includes(id)) onChange(values.filter((x) => x !== id));
+    else onChange([...values, id]);
+  };
+
+  const visible = values.slice(0, 3);
+  const extra = values.length - 3;
+
   return (
     <span
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); setOpen((x) => !x); }}
-      style={{ position: "relative", display: "inline-flex", cursor: "pointer" }}
-      title={o ? "Click to change owner" : "Click to assign owner"}>
-      {o
-        ? <Avatar owner={o} initials={value} />
-        : <span style={{ width: 22, height: 22, borderRadius: "50%", border: "1.5px dashed var(--ink-4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--ink-4)" }}>+</span>
-      }
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
+      <span style={{ display: "flex", alignItems: "center" }}>
+        {values.length === 0
+          ? <span style={{ width: 22, height: 22, borderRadius: "50%", border: "1.5px dashed var(--ink-4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--ink-4)" }}>+</span>
+          : visible.map((id, i) => (
+            <span key={id} style={{ marginLeft: i > 0 ? -7 : 0, zIndex: visible.length - i, position: "relative" }}>
+              <Avatar owner={ctxOwners[id]} initials={id} />
+            </span>
+          ))
+        }
+        {extra > 0 && (
+          <span style={{ marginLeft: -7, zIndex: 0, width: 22, height: 22, borderRadius: "50%", background: "var(--paper-3)", border: "1.5px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8.5, fontWeight: 700, color: "var(--ink-3)", fontFamily: "IBM Plex Mono, monospace" }}>
+            +{extra}
+          </span>
+        )}
+      </span>
       {open && (
         <React.Fragment>
           <div
@@ -2782,7 +2824,7 @@ function OwnerPicker({ value, onChange }) {
               position: "absolute", top: "100%", right: 0, marginTop: 4,
               background: "var(--paper-2)", border: "1px solid var(--line)",
               borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
-              zIndex: 100, padding: 4, minWidth: 190, maxHeight: 320, overflowY: "auto",
+              zIndex: 100, padding: 4, minWidth: 200, maxHeight: 320, overflowY: "auto",
             }}>
             {ctxTeams.map((team) => (
               <React.Fragment key={team.id}>
@@ -2796,23 +2838,24 @@ function OwnerPicker({ value, onChange }) {
                 {team.members.map((k) => {
                   const o2 = ctxOwners[k];
                   if (!o2) return null;
-                  const active = k === value;
+                  const active = values.includes(k);
                   return (
                     <button key={k}
-                      onClick={() => { onChange(k); setOpen(false); }}
+                      onClick={() => toggle(k)}
                       style={{
                         display: "flex", alignItems: "center", gap: 8, width: "100%",
                         padding: "5px 8px", border: "none",
-                        background: active ? "var(--ink)" : "transparent",
-                        color: active ? "var(--paper)" : "var(--ink-2)",
+                        background: active ? "rgba(138,58,31,0.10)" : "transparent",
+                        color: "var(--ink-2)",
                         fontFamily: "inherit", fontSize: 12,
                         cursor: "pointer", borderRadius: 2, textAlign: "left",
                       }}
                       onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--paper-3)"; }}
-                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                      onMouseLeave={(e) => { e.currentTarget.style.background = active ? "rgba(138,58,31,0.10)" : "transparent"; }}>
                       <Avatar owner={o2} initials={k} />
                       <span>{o2.name}</span>
-                      <span className="mono" style={{ marginLeft: "auto", color: active ? "var(--paper-3)" : "var(--ink-4)", fontSize: 10 }}>{o2.role}</span>
+                      <span className="mono" style={{ marginLeft: "auto", color: "var(--ink-4)", fontSize: 10 }}>{o2.role}</span>
+                      {active && <span style={{ color: "var(--accent)", fontSize: 11, lineHeight: 1 }}>✓</span>}
                     </button>
                   );
                 })}
@@ -2822,6 +2865,115 @@ function OwnerPicker({ value, onChange }) {
         </React.Fragment>
       )}
     </span>
+  );
+}
+
+// ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
+function TaskDetailCard({ item, onClose, onSave }) {
+  const { owners: ctxOwners } = React.useContext(OwnersCtx);
+  const [notes, setNotes] = useState(item.notes || "");
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    onSave(notes);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  };
+
+  const rootColor = rootInfo(item.code || "").color;
+  const dur = item.start && item.end ? dayDiff(item.start, item.end) : 0;
+  const ownerList = (item.owners || []).map((id) => ({ id, o: ctxOwners[id] })).filter((x) => x.o);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: 6,
+          boxShadow: "0 24px 60px -16px rgba(0,0,0,0.3)", width: 420,
+          display: "flex", flexDirection: "column", overflow: "hidden",
+        }}>
+
+        {/* Header */}
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <span className="mono" style={{ fontSize: 11, color: rootColor, fontWeight: 700, letterSpacing: 0.3, paddingTop: 3, flexShrink: 0 }}>{item.code}</span>
+          <span className="serif" style={{ fontSize: 18, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.3 }}>{item.name}</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 15, padding: 4, flexShrink: 0 }}>✕</button>
+        </div>
+
+        {/* Info grid */}
+        <div style={{ padding: "14px 20px", display: "grid", gridTemplateColumns: "68px 1fr", rowGap: 10, columnGap: 12, fontSize: 12.5, alignItems: "start" }}>
+          <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", paddingTop: 2 }}>기간</span>
+          <span style={{ color: "var(--ink-2)" }}>
+            {item.start ? fmtDate(item.start) : "—"} → {item.end ? fmtDate(item.end) : "—"}
+            {dur > 0 && <span className="mono" style={{ marginLeft: 8, color: "var(--ink-4)", fontSize: 11 }}>{dur}d</span>}
+          </span>
+
+          <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", paddingTop: 2 }}>진행률</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, maxWidth: 120, height: 5, background: "var(--line)", borderRadius: 3, overflow: "hidden" }}>
+              <span style={{ display: "block", height: "100%", width: `${item.pct}%`, background: rootColor, borderRadius: 3 }} />
+            </span>
+            <span className="mono" style={{ fontSize: 11, color: "var(--ink-2)" }}>{item.pct}%</span>
+          </span>
+
+          {ownerList.length > 0 && (
+            <React.Fragment>
+              <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", paddingTop: 4 }}>담당자</span>
+              <span style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px" }}>
+                {ownerList.map(({ id, o }) => (
+                  <span key={id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <Avatar owner={o} initials={id} />
+                    <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{o.name}</span>
+                    {o.role && <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{o.role}</span>}
+                  </span>
+                ))}
+              </span>
+            </React.Fragment>
+          )}
+
+          {item.segments && item.segments.length > 1 && (
+            <React.Fragment>
+              <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", paddingTop: 2 }}>구간</span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {item.segments.map((seg, i) => (
+                  <span key={i} className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                    {i + 1}. {seg.start ? fmtDate(seg.start) : "—"} → {seg.end ? fmtDate(seg.end) : "—"}
+                  </span>
+                ))}
+              </span>
+            </React.Fragment>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--line)" }}>
+          <div className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", margin: "12px 0 6px" }}>비고</div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="메모를 입력하세요..."
+            style={{
+              width: "100%", minHeight: 90, resize: "vertical", boxSizing: "border-box",
+              background: "var(--paper)", border: "1px solid var(--line-2)", borderRadius: 3,
+              padding: "8px 10px", fontFamily: "IBM Plex Sans, sans-serif",
+              fontSize: 12.5, color: "var(--ink)", outline: "none", lineHeight: 1.5,
+            }}
+            onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+            onBlur={(e) => e.target.style.borderColor = "var(--line-2)"}
+          />
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
+          {saved && <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", marginRight: "auto" }}>저장됨 ✓</span>}
+          <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>닫기</button>
+          <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
