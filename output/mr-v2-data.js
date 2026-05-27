@@ -18,7 +18,7 @@ window.__GANTT_DATA__ = {
   // ── 날짜 ──────────────────────────────────────────────────────
   projectStart: new Date(_Y, 3, 6),   // Apr 6
   projectEnd:   new Date(_Y, 6, 19),  // Jul 19
-  today:        new Date(_Y, 4, 26),  // null 로 바꾸면 실제 오늘 날짜 사용
+  today:        null,  // null이면 실제 오늘 날짜 사용
 
   // ── 저장소 키 (프로젝트마다 고유하게) ─────────────────────────
   storageKey: "mr-v2-gantt-state-v1",

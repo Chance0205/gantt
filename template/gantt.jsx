@@ -881,14 +881,10 @@ function Masthead({ stats, meta, updateMeta }) {
             {`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][TODAY.getDay()]}, ${monthName(TODAY.getMonth())} ${TODAY.getDate()}, ${TODAY.getFullYear()}`}
           </span>
         </div>
-        <MetaField value={meta.headerRight} onCommit={(v) => updateMeta({ headerRight: v })}
-          textStyle={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--ink-3)" }} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "end", marginTop: 16, gap: 24 }}>
         <div>
-          <MetaField value={meta.subtitle} onCommit={(v) => updateMeta({ subtitle: v })}
-            textStyle={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 500, color: "var(--accent)", display: "block", marginBottom: 6 }} />
           <h1 className="serif" style={{ fontSize: 56, lineHeight: 1.0, margin: 0, letterSpacing: "-0.02em", color: "var(--ink)", display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <MetaField value={meta.wbsPrefix} onCommit={(v) => updateMeta({ wbsPrefix: v })}
               textStyle={{ fontSize: 56, fontFamily: "Instrument Serif, Georgia, serif", letterSpacing: "-0.02em", color: "var(--ink)" }} />
@@ -906,20 +902,6 @@ function Masthead({ stats, meta, updateMeta }) {
         </div>
       </div>
 
-      <p style={{ marginTop: 14, maxWidth: 880, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.55 }}>
-        <span className="mono small-caps" style={{ color: "var(--accent)", marginRight: 6 }}>Tip</span>
-        Click a summary name to collapse. Drag <span className="mono">⋮⋮</span> to reorder — move
-        horizontally during drag to promote / demote (level). Drag a bar's middle to shift the schedule;
-        edges to resize. Pull the small dot at a bar's tail to draw a dependency. Click an arrow to select
-        it, then <span className="mono" style={{ background: "var(--paper-3)", padding: "1px 4px", borderRadius: 2 }}>Delete</span> or right-click for a menu.
-        Drag empty timeline area to pan. Zoom toolbar switches between
-        <span className="mono" style={{ background: "var(--paper-3)", padding: "1px 6px", borderRadius: 2, margin: "0 4px" }}>1 mo</span>
-        /
-        <span className="mono" style={{ background: "var(--paper-3)", padding: "1px 6px", borderRadius: 2, margin: "0 4px" }}>4 mo</span>
-        /
-        <span className="mono" style={{ background: "var(--paper-3)", padding: "1px 6px", borderRadius: 2, margin: "0 4px" }}>12 mo</span>
-        — 1 mo shows daily date headers.
-      </p>
     </header>);
 
 }
