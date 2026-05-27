@@ -2850,10 +2850,24 @@ function TeamModal({ owners, teams, onSave, onClose }) {
     setEt((prev) => prev.map((t) => t.id === teamId ? { ...t, members: [...t.members, id] } : t));
   };
 
+  const updTeam = (teamId, patch) => setEt((prev) => prev.map((t) => t.id === teamId ? { ...t, ...patch } : t));
+
+  const addTeam = () => {
+    const id = "T" + Date.now().toString(36).slice(-4).toUpperCase();
+    setEt((prev) => [...prev, { id, name: "새 팀", members: [] }]);
+  };
+
+  const delTeam = (teamId) => {
+    const members = et.find((t) => t.id === teamId)?.members || [];
+    setEo((prev) => { const n = { ...prev }; members.forEach((m) => delete n[m]); return n; });
+    setEt((prev) => prev.filter((t) => t.id !== teamId));
+  };
+
   const handleSave = () => {
-    // 빈 이름 필터링
     const cleaned = Object.fromEntries(Object.entries(eo).filter(([, o]) => o.name.trim()));
-    const cleanedTeams = et.map((t) => ({ ...t, members: t.members.filter((m) => cleaned[m]) }));
+    const cleanedTeams = et
+      .filter((t) => t.name.trim())
+      .map((t) => ({ ...t, members: t.members.filter((m) => cleaned[m]) }));
     onSave(cleaned, cleanedTeams);
     onClose();
   };
@@ -2882,9 +2896,22 @@ function TeamModal({ owners, teams, onSave, onClose }) {
           {et.map((team) => (
             <div key={team.id} style={{ marginTop: 18 }}>
               <div className="mono small-caps" style={{ fontSize: 10.5, color: "var(--ink-3)", marginBottom: 8, display: "flex", alignItems: "center", gap: 8, letterSpacing: "0.1em" }}>
-                <span>{team.name}</span>
+                <input
+                  value={team.name}
+                  onChange={(e) => updTeam(team.id, { name: e.target.value })}
+                  style={{
+                    background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)",
+                    outline: "none", fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5,
+                    color: "var(--ink-3)", letterSpacing: "0.1em", textTransform: "uppercase",
+                    padding: "0 0 1px", minWidth: 0, width: `${Math.max((team.name || "").length, 4)}ch`,
+                  }}
+                />
                 <span style={{ flex: 1, height: 1, background: "var(--line-2)" }} />
                 <span>{team.members.filter((m) => eo[m]).length}</span>
+                <span onClick={() => delTeam(team.id)}
+                  style={{ cursor: "pointer", color: "var(--ink-4)", fontSize: 10, lineHeight: 1 }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "#c44b3d"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>✕</span>
               </div>
               {/* Column headers */}
               <div style={{ display: "grid", gridTemplateColumns: "26px 42px 1fr 90px 24px", gap: 8, padding: "0 0 4px", borderBottom: "1px solid var(--line)" }}>
@@ -2907,7 +2934,7 @@ function TeamModal({ owners, teams, onSave, onClose }) {
                   </div>
                 );
               })}
-              {/* Add button */}
+              {/* Add member button */}
               <button onClick={() => addOwner(team.id)} style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: "var(--ink-4)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, padding: "4px 0", letterSpacing: "0.05em" }}
                 onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
                 onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>
@@ -2915,6 +2942,18 @@ function TeamModal({ owners, teams, onSave, onClose }) {
               </button>
             </div>
           ))}
+
+          {/* Add team button */}
+          <button onClick={addTeam} style={{
+            marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", padding: "7px 0", background: "none",
+            border: "1px dashed var(--line-2)", borderRadius: 3, cursor: "pointer",
+            color: "var(--ink-4)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.05em",
+          }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)"; e.currentTarget.style.color = "var(--ink-4)"; }}>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> 새 팀 추가
+          </button>
         </div>
 
         {/* Footer */}
