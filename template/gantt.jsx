@@ -2276,14 +2276,20 @@ function EditableText({ value, onCommit, style, multiline, suggestions }) {
 function OwnersPicker({ values, onChange }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
+  const [dropPos, setDropPos] = useState(null); // fixed 좌표
   const triggerRef = React.useRef(null);
 
   const handleToggleOpen = (e) => {
     e.stopPropagation();
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setOpenUpward(window.innerHeight - rect.bottom < 300);
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const right = window.innerWidth - rect.right;
+      if (spaceBelow < 320) {
+        setDropPos({ bottom: window.innerHeight - rect.top + 4, right });
+      } else {
+        setDropPos({ top: rect.bottom + 4, right });
+      }
     }
     setOpen((x) => !x);
   };
@@ -2382,11 +2388,10 @@ function OwnersPicker({ values, onChange }) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute", right: 0,
-              ...(openUpward ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
+              position: "fixed", ...dropPos,
               background: "var(--paper-2)", border: "1px solid var(--line)",
               borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
-              zIndex: 100, padding: 4, minWidth: 210, maxHeight: 320, overflowY: "auto",
+              zIndex: 200, padding: 4, minWidth: 210, maxHeight: 320, overflowY: "auto",
             }}>
 
             {/* ALL row */}
