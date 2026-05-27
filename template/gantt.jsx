@@ -2901,16 +2901,34 @@ function Footer({ enriched }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {overdue.map((r, i) => {
               const rootColor = rootInfo(r.code || "").color;
+              // 코드 "3.2.1" → 상위 코드 ["3", "3.2"] 찾아서 이름 추출
+              const codeParts = (r.code || "").split(".");
+              const ancestors = codeParts.slice(0, -1).map((_, idx) => {
+                const parentCode = codeParts.slice(0, idx + 1).join(".");
+                return (enriched || []).find((x) => x.code === parentCode);
+              }).filter(Boolean);
               return (
                 <div key={r.id} style={{
-                  display: "grid", gridTemplateColumns: "auto 1fr auto",
-                  gap: "0 10px", alignItems: "center",
-                  padding: "5px 0",
+                  padding: "6px 0",
                   borderBottom: i < overdue.length - 1 ? "1px dashed var(--line-2)" : "none"
                 }}>
-                  <span className="mono" style={{ fontSize: 10, color: rootColor, fontWeight: 700, letterSpacing: 0.3 }}>{r.code}</span>
-                  <span style={{ fontSize: 12, color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                  <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>+{r.overdueDays}d</span>
+                  {/* 상위 경로 */}
+                  {ancestors.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                      {ancestors.map((anc, ai) => (
+                        <React.Fragment key={anc.id}>
+                          {ai > 0 && <span style={{ color: "var(--ink-4)", fontSize: 9 }}>›</span>}
+                          <span style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{anc.name}</span>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  )}
+                  {/* 태스크 본문 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="mono" style={{ fontSize: 10, color: rootColor, fontWeight: 700, letterSpacing: 0.3, flexShrink: 0 }}>{r.code}</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", fontWeight: 600, whiteSpace: "nowrap" }}>+{r.overdueDays}d</span>
+                  </div>
                 </div>
               );
             })}
