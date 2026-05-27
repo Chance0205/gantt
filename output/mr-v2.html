@@ -1215,10 +1215,11 @@ function App() {
   // New leaf task added at end of list, level 1.
   const addNewTask = useCallback((afterId) => {
     const id = `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const firstOwner = Object.keys(owners)[0] ?? null;
     setItems((items) => {
       if (!afterId) {
         return [...items, {
-          id, level: 1, name: "New task", owners: ["KE"],
+          id, level: 1, name: "New task", owners: firstOwner ? [firstOwner] : [],
           start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
           segments: [{ start: addDays(TODAY, 1), end: addDays(TODAY, 8) }], notes: "",
         }];
@@ -1230,7 +1231,8 @@ function App() {
       const row = items[idx];
       const level = Math.min(row.level + 1, 3);
       const parentIsSummary = hasChildrenAfter(items, idx);
-      const ownerIds = parentIsSummary ? [] : ((row.owners || []).filter(o => owners[o]).length > 0 ? [...row.owners] : ["KE"]);
+      const validParentOwners = (row.owners || []).filter(o => owners[o]);
+      const ownerIds = parentIsSummary ? [] : (validParentOwners.length > 0 ? validParentOwners : (firstOwner ? [firstOwner] : []));
 
       const [, subEnd] = subtreeRange(items, idx);
       const next = [...items];
@@ -2669,6 +2671,14 @@ function LeafBar({ r, segIdx, totalSegs, isFirstSeg, isLastSeg, fillFraction,
 //                       BITS
 // ====================================================================
 function Avatar({ owner, initials }) {
+  if (!owner) return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: 22, height: 22, borderRadius: 99,
+      background: "var(--line-2)", color: "var(--ink-4)",
+      fontFamily: "IBM Plex Mono", fontSize: 9.5, letterSpacing: 0.5, flexShrink: 0
+    }}>{(initials || "?").slice(0, 2)}</span>
+  );
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
