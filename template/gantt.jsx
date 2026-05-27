@@ -346,10 +346,10 @@ function downloadJSON(items, collapsed, meta) {
 function App() {
   const [v, setTweak] = window.useTweaks ? window.useTweaks({
     accent: "#8a3a1f",
-    zoom: "month4",
+    zoom: "month1",
     showDeps: true,
     owner: "all"
-  }) : [{ accent: "#8a3a1f", zoom: "month4", showDeps: true, owner: "all" }, () => {}];
+  }) : [{ accent: "#8a3a1f", zoom: "month1", showDeps: true, owner: "all" }, () => {}];
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", v.accent);
@@ -363,6 +363,8 @@ function App() {
       wbsPrefix:   PROJECT_CONFIG.wbsPrefix,
       wbsSuffix:   PROJECT_CONFIG.wbsSuffix,
       headerRight: PROJECT_CONFIG.headerRight,
+      projectStart: PROJECT_CONFIG.projectStart.toISOString().slice(0, 10),
+      projectEnd:   PROJECT_CONFIG.projectEnd.toISOString().slice(0, 10),
     };
   });
   const updateMeta = useCallback((patch) => {
@@ -403,14 +405,20 @@ function App() {
   }, [meta.wbsPrefix, meta.wbsSuffix]);
 
   // Map legacy keys (density/scale) so users who saved old settings still work.
-  const zoom = v.zoom || (v.density === "spacious" ? "month1" : v.density === "comfortable" ? "month4" : "month4");
-  // Day width by zoom level. month1 = daily cells; month4 = weekly cells; month12 = monthly cells.
-  const dayW = zoom === "month1" ? 40 : zoom === "month12" ? 5 : 14;
+  const zoom = (v.zoom === "month4" || !v.zoom) ? "month1" : v.zoom; // month4 제거 → month1 fallback
+  // Day width by zoom level. month1 = daily cells; month12 = monthly cells.
+  const dayW = zoom === "month1" ? 24 : 5;
   const rowH = 30;
 
-  // Visible timeline range. For 12mo, show the entire calendar year so empty months are visible.
-  const viewStart = zoom === "month12" ? new Date(PROJECT_START.getFullYear(), 0, 1) : PROJECT_START;
-  const viewEnd   = zoom === "month12" ? new Date(PROJECT_START.getFullYear(), 11, 31) : PROJECT_END;
+  // 편집 가능한 프로젝트 기간 (meta에서 읽기, 없으면 CONFIG 기본값)
+  const projStart = meta.projectStart ? new Date(meta.projectStart) : PROJECT_START;
+  const projEnd   = meta.projectEnd   ? new Date(meta.projectEnd)   : PROJECT_END;
+
+  // Visible timeline range: 전체 프로젝트 기간을 항상 표시.
+  // month12: 프로젝트를 포함하는 전체 연도(들)를 표시
+  // month1:  프로젝트 시작~끝 (일 단위)
+  const viewStart = zoom === "month12" ? new Date(projStart.getFullYear(), 0, 1) : projStart;
+  const viewEnd   = zoom === "month12" ? new Date(projEnd.getFullYear(), 11, 31)  : projEnd;
   const viewTotalDays = dayDiff(viewStart, viewEnd);
   const leftW = 380;
 
@@ -523,6 +531,8 @@ function App() {
       wbsPrefix:   PROJECT_CONFIG.wbsPrefix,
       wbsSuffix:   PROJECT_CONFIG.wbsSuffix,
       headerRight: PROJECT_CONFIG.headerRight,
+      projectStart: PROJECT_CONFIG.projectStart.toISOString().slice(0, 10),
+      projectEnd:   PROJECT_CONFIG.projectEnd.toISOString().slice(0, 10),
     });
   }, []);
 
@@ -1001,8 +1011,8 @@ function App() {
   return (
     <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
     <div>
-      <Masthead stats={stats} meta={meta} updateMeta={updateMeta} />
-      <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
+      <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
+      <Toolbar v={v} zoom={zoom} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
       <div style={{
         background: "var(--paper-2)",
         border: "1px solid var(--line)",
@@ -1122,7 +1132,11 @@ function MetaField({ value, onCommit, textStyle, inputStyle }) {
   );
 }
 
-function Masthead({ stats, meta, updateMeta }) {
+function Masthead({ stats, meta, updateMeta, projStart, projEnd }) {
+  // 날짜 포맷 헬퍼
+  const fmtShort = (d) => d ? `${monthName(d.getMonth())} ${d.getDate()}, ${d.getFullYear()}` : "—";
+  const totalDays = projStart && projEnd ? dayDiff(projStart, projEnd) : 0;
+
   return (
     <header style={{ marginBottom: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid var(--ink)", paddingBottom: 14 }}>
@@ -1131,6 +1145,28 @@ function Masthead({ stats, meta, updateMeta }) {
           <span className="serif" style={{ fontSize: 26, lineHeight: 1, color: "var(--ink)", letterSpacing: "-0.005em" }}>
             {`${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][TODAY.getDay()]}, ${monthName(TODAY.getMonth())} ${TODAY.getDate()}, ${TODAY.getFullYear()}`}
           </span>
+        </div>
+        {/* 프로젝트 기간 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em" }}>Project</span>
+          <input
+            type="date"
+            value={meta.projectStart || ""}
+            onChange={(e) => updateMeta({ projectStart: e.target.value })}
+            style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12, color: "var(--ink-2)", background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: "2px 4px", cursor: "pointer" }}
+            onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+            onBlur={(e) => e.target.style.borderColor = "var(--line-2)"}
+          />
+          <span className="mono" style={{ color: "var(--ink-4)", fontSize: 12 }}>→</span>
+          <input
+            type="date"
+            value={meta.projectEnd || ""}
+            onChange={(e) => updateMeta({ projectEnd: e.target.value })}
+            style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12, color: "var(--ink-2)", background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: "2px 4px", cursor: "pointer" }}
+            onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+            onBlur={(e) => e.target.style.borderColor = "var(--line-2)"}
+          />
+          {totalDays > 0 && <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{totalDays}d</span>}
         </div>
       </div>
 
@@ -1184,7 +1220,7 @@ function SaveIndicator({ status }) {
   );
 }
 
-function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
+function Toolbar({ v, zoom, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
   const fileRef = useRef(null);
   return (
     <div style={{
@@ -1192,7 +1228,7 @@ function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus, onTeam 
       background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: 4, marginBottom: -1,
       borderBottom: "none"
     }}>
-      <Seg label="Zoom" value={v.zoom || "month4"} options={[["month1", "1 mo"], ["month4", "4 mo"], ["month12", "12 mo"]]} onChange={(x) => setTweak("zoom", x)} />
+      <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
       <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
       <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
         <SaveIndicator status={saveStatus} />
@@ -1440,7 +1476,7 @@ function GanttGrid(props) {
     });
   }
 
-  const zoomLevel = v.zoom || "month4";
+  const zoomLevel = (v.zoom === "month4" || !v.zoom) ? "month1" : v.zoom;
 
   useEffect(() => {
     if (scrollWrapRef.current) {
@@ -1673,7 +1709,7 @@ function GanttGrid(props) {
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, top: 24, height: 32 }}>
               {zoomLevel === "month12" ?
-              /* 12-month zoom: no sub-rail, just continuation of month dividers */
+              /* 12-month zoom: month 경계만 표시 */
               months.map((m, idx) => {
                 const next = months[idx + 1];
                 const w = ((next ? next.i : viewTotalDays) - m.i) * dayW;
@@ -1683,41 +1719,26 @@ function GanttGrid(props) {
                     borderRight: "1px dashed var(--line-2)"
                   }} />);
               }) :
-              zoomLevel === "month1" ?
-              /* 1-month zoom: per-day cells showing date number */
+              /* month1: 일 단위 셀, 주말 붉은 배경 */
               days.map((dt, i) => {
                 const isToday = dt.getTime() === TODAY.getTime();
                 const isFirstOfMonth = dt.getDate() === 1;
+                const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                 return (
                   <div key={i} style={{
                     position: "absolute", left: i * dayW, width: dayW, height: 32,
                     borderRight: isFirstOfMonth ? "1px solid var(--line)" : "1px dashed var(--line-2)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                    background: isToday ? "rgba(138,58,31,0.08)" : "transparent"
+                    background: isToday ? "rgba(138,58,31,0.12)" : isWeekend ? "rgba(200,40,40,0.07)" : "transparent"
                   }}>
-                    <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: 0.4, lineHeight: 1 }}>
+                    <span className="mono" style={{ fontSize: 8.5, color: isWeekend ? "rgba(200,40,40,0.7)" : "var(--ink-4)", letterSpacing: 0.4, lineHeight: 1 }}>
                       {["S","M","T","W","T","F","S"][dt.getDay()]}
                     </span>
                     <span className="mono" style={{
-                      fontSize: 12, color: isToday ? "var(--accent)" : "var(--ink-2)",
+                      fontSize: 11, color: isToday ? "var(--accent)" : isWeekend ? "rgba(200,40,40,0.6)" : "var(--ink-2)",
                       fontWeight: isToday ? 600 : 400, marginTop: 1, lineHeight: 1
                     }}>{dt.getDate()}</span>
                   </div>);
-              }) :
-              /* 4-month zoom: weekly cells */
-              weeks.map((w, idx) => {
-                const next = weeks[idx + 1];
-                const wpx = ((next ? next.i : viewTotalDays) - w.i) * dayW;
-                return (
-                  <div key={idx} style={{
-                    position: "absolute", left: w.i * dayW, width: wpx, height: 32,
-                    borderRight: "1px dashed var(--line-2)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "0 8px"
-                  }}>
-                      <span className="mono small-caps" style={{ color: "var(--ink-3)" }}>W{w.w}</span>
-                      <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{fmtDate(w.dt)}</span>
-                    </div>);
               })
               }
             </div>
@@ -1728,7 +1749,7 @@ function GanttGrid(props) {
             onMouseDown={startPan}
             style={{ position: "relative", height: totalRowsHeight, cursor: depDrag ? "crosshair" : "grab" }}>
             
-            {/* grid lines — zoom에 맞춰 헤더와 동일한 기준으로 */}
+            {/* grid lines + 주말 배경 — zoom에 맞춰 */}
             {zoomLevel === "month12" ? (
               /* month12: 월 경계선 */
               months.map((m, idx) =>
@@ -1737,9 +1758,17 @@ function GanttGrid(props) {
                   background: "var(--line)", pointerEvents: "none"
                 }} />
               )
-            ) : zoomLevel === "month1" ? (
-              /* month1: 월 경계(실선) + 주 경계(점선) */
+            ) : (
+              /* month1: 주말 배경 + 주 경계(점선) + 월 경계(실선) */
               <>
+                {days.map((dt, i) => {
+                  const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+                  if (!isWeekend) return null;
+                  return <div key={`wknd${i}`} style={{
+                    position: "absolute", top: 0, left: i * dayW, width: dayW, height: totalRowsHeight,
+                    background: "rgba(200,40,40,0.04)", pointerEvents: "none"
+                  }} />;
+                })}
                 {weeks.map((w, idx) =>
                   <div key={`w${idx}`} style={{
                     position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
@@ -1753,14 +1782,6 @@ function GanttGrid(props) {
                   }} />
                 )}
               </>
-            ) : (
-              /* month4: 주 기준 (기존과 동일) */
-              weeks.map((w, idx) =>
-                <div key={idx} style={{
-                  position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
-                  background: "var(--line)", pointerEvents: "none"
-                }} />
-              )
             )}
 
             {/* row tinting + separators */}
@@ -1967,7 +1988,7 @@ function GanttGrid(props) {
       </div>
     {detailId && (() => {
       const detailItem = rows.find((r) => r.id === detailId);
-      return detailItem ? <TaskDetailCard item={detailItem} onClose={() => setDetailId(null)} onSave={(notes) => updateItem(detailId, { notes })} /> : null;
+      return detailItem ? <TaskDetailCard item={detailItem} rows={rows} onClose={() => setDetailId(null)} onSave={(notes) => updateItem(detailId, { notes })} /> : null;
     })()}
     </div>);
 
@@ -2492,7 +2513,7 @@ function OwnersPicker({ values, onChange }) {
 }
 
 // ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
-function TaskDetailCard({ item, onClose, onSave }) {
+function TaskDetailCard({ item, rows, onClose, onSave }) {
   const { owners: ctxOwners } = React.useContext(OwnersCtx);
   const [notes, setNotes] = useState(item.notes || "");
   const [saved, setSaved] = useState(false);
@@ -2566,6 +2587,26 @@ function TaskDetailCard({ item, onClose, onSave }) {
                     {i + 1}. {seg.start ? fmtDate(seg.start) : "—"} → {seg.end ? fmtDate(seg.end) : "—"}
                   </span>
                 ))}
+              </span>
+            </React.Fragment>
+          )}
+
+          {item.deps && item.deps.length > 0 && (
+            <React.Fragment>
+              <span className="mono small-caps" style={{ fontSize: 9.5, color: "var(--ink-4)", letterSpacing: "0.08em", paddingTop: 4 }}>선행업무</span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {item.deps.map((depId) => {
+                  const dep = (rows || []).find((r) => r.id === depId);
+                  const depColor = dep ? rootInfo(dep.code || "").color : "var(--ink-4)";
+                  return dep ? (
+                    <span key={depId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span className="mono" style={{ fontSize: 10, color: depColor, fontWeight: 700, letterSpacing: 0.3 }}>{dep.code}</span>
+                      <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{dep.name}</span>
+                    </span>
+                  ) : (
+                    <span key={depId} className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>{depId}</span>
+                  );
+                })}
               </span>
             </React.Fragment>
           )}
