@@ -387,9 +387,15 @@ function App() {
     TEAMS.splice(0, TEAMS.length, ...teams);
   }, [owners, teams]);
 
-  const updateTeamData = useCallback((newOwners, newTeams) => {
+  const updateTeamData = useCallback((newOwners, newTeams, renames = {}) => {
     setOwners(newOwners);
     setTeams(newTeams);
+    if (Object.keys(renames).length > 0) {
+      setItems((prev) => prev.map((it) => ({
+        ...it,
+        owners: (it.owners || []).map((id) => renames[id] ?? id),
+      })));
+    }
   }, []);
 
   useEffect(() => {
@@ -2524,6 +2530,7 @@ const TINT_PALETTE = [
 function TeamModal({ owners, teams, onSave, onClose }) {
   const [eo, setEo] = useState(() => JSON.parse(JSON.stringify(owners)));
   const [et, setEt] = useState(() => teams.map((t) => ({ ...t, members: [...t.members] })));
+  const [renames, setRenames] = useState({}); // { originalId → currentId }
 
   const updOwner = (id, patch) => setEo((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
@@ -2531,6 +2538,14 @@ function TeamModal({ owners, teams, onSave, onClose }) {
     newId = newId.trim();
     if (!newId || newId === oldId) return;
     if (eo[newId]) return; // 중복 ID — 무시
+    setRenames((prev) => {
+      const n = { ...prev };
+      // oldId가 이미 rename된 결과라면 원래 key를 찾아서 업데이트
+      const origKey = Object.keys(n).find((k) => n[k] === oldId) ?? oldId;
+      if (origKey === newId) delete n[origKey]; // 원래대로 되돌린 경우
+      else n[origKey] = newId;
+      return n;
+    });
     setEo((prev) => { const n = { ...prev, [newId]: { ...prev[oldId] } }; delete n[oldId]; return n; });
     setEt((prev) => prev.map((t) => ({ ...t, members: t.members.map((m) => m === oldId ? newId : m) })));
   };
@@ -2566,7 +2581,7 @@ function TeamModal({ owners, teams, onSave, onClose }) {
     const cleanedTeams = et
       .filter((t) => t.name.trim())
       .map((t) => ({ ...t, members: t.members.filter((m) => cleaned[m]) }));
-    onSave(cleaned, cleanedTeams);
+    onSave(cleaned, cleanedTeams, renames);
     onClose();
   };
 
