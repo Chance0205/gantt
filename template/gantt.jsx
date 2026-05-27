@@ -1340,43 +1340,45 @@ function GanttGrid(props) {
                 <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>}
                 <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
 
-                {/* 행별 + / ✕ 버튼 (hover 시 표시) */}
-                <span
-                  onClick={(e) => { e.stopPropagation(); addNewTask(r.id); }}
-                  title={`Level ${r.level} 태스크를 아래에 추가`}
-                  style={{
-                    opacity: isHover ? 1 : 0,
-                    pointerEvents: isHover ? "auto" : "none",
-                    transition: "opacity 120ms",
-                    width: 16, height: 16, flexShrink: 0,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    borderRadius: 2, border: "1px solid var(--line-2)",
-                    color: "var(--accent)", fontSize: 13, cursor: "pointer",
-                    fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
-                    background: "var(--paper-2)", marginLeft: -2,
-                  }}>+</span>
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (r.isSummary && r.leafCount > 0) {
-                      if (!confirm(`"${r.name}" 및 하위 ${r.leafCount}개 태스크를 모두 삭제할까요?`)) return;
-                    }
-                    deleteItem(r.id);
-                  }}
-                  title="태스크 삭제 (Delete 키)"
-                  style={{
-                    opacity: isHover ? 1 : 0,
-                    pointerEvents: isHover ? "auto" : "none",
-                    transition: "opacity 120ms",
-                    width: 16, height: 16, flexShrink: 0,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    borderRadius: 2, border: "1px solid var(--line-2)",
-                    color: "var(--ink-3)", fontSize: 11, cursor: "pointer",
-                    lineHeight: 1, background: "var(--paper-2)", marginLeft: -2,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#c44b3d"; e.currentTarget.style.borderColor = "#c44b3d"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ink-3)"; e.currentTarget.style.borderColor = "var(--line-2)"; }}
-                >✕</span>
+                {/* 행별 + / ✕ 버튼 — absolute 배치로 flex 레이아웃에 영향 없음 */}
+                <div style={{
+                  position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                  display: "flex", gap: 3, zIndex: 3,
+                  opacity: isHover ? 1 : 0,
+                  pointerEvents: isHover ? "auto" : "none",
+                  transition: "opacity 120ms",
+                }}>
+                  <span
+                    onClick={(e) => { e.stopPropagation(); addNewTask(r.id); }}
+                    title={`Level ${r.level} 태스크를 아래에 추가`}
+                    style={{
+                      width: 16, height: 16,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      borderRadius: 2, border: "1px solid var(--line-2)",
+                      color: "var(--accent)", fontSize: 13, cursor: "pointer",
+                      fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
+                      background: "var(--paper-2)",
+                    }}>+</span>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (r.isSummary && r.leafCount > 0) {
+                        if (!confirm(`"${r.name}" 및 하위 ${r.leafCount}개 태스크를 모두 삭제할까요?`)) return;
+                      }
+                      deleteItem(r.id);
+                    }}
+                    title="태스크 삭제 (Delete 키)"
+                    style={{
+                      width: 16, height: 16,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      borderRadius: 2, border: "1px solid var(--line-2)",
+                      color: "var(--ink-3)", fontSize: 11, cursor: "pointer",
+                      lineHeight: 1, background: "var(--paper-2)",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#c44b3d"; e.currentTarget.style.borderColor = "#c44b3d"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ink-3)"; e.currentTarget.style.borderColor = "var(--line-2)"; }}
+                  >✕</span>
+                </div>
 
               </div>);
 
