@@ -2276,6 +2276,17 @@ function EditableText({ value, onCommit, style, multiline, suggestions }) {
 function OwnersPicker({ values, onChange }) {
   const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const triggerRef = React.useRef(null);
+
+  const handleToggleOpen = (e) => {
+    e.stopPropagation();
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setOpenUpward(window.innerHeight - rect.bottom < 300);
+    }
+    setOpen((x) => !x);
+  };
 
   const allMembers = ctxTeams.flatMap((t) => t.members).filter((m) => ctxOwners[m]);
 
@@ -2331,8 +2342,9 @@ function OwnersPicker({ values, onChange }) {
 
   return (
     <span
+      ref={triggerRef}
       onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => { e.stopPropagation(); setOpen((x) => !x); }}
+      onClick={handleToggleOpen}
       style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
       {/* 표시: ALL/팀명 뱃지 or 아바타 스택 */}
       {displayLabel ? (
@@ -2370,10 +2382,11 @@ function OwnersPicker({ values, onChange }) {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute", top: "100%", right: 0, marginTop: 4,
+              position: "absolute", right: 0,
+              ...(openUpward ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
               background: "var(--paper-2)", border: "1px solid var(--line)",
               borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
-              zIndex: 100, padding: 4, minWidth: 210, maxHeight: 340, overflowY: "auto",
+              zIndex: 100, padding: 4, minWidth: 210, maxHeight: 320, overflowY: "auto",
             }}>
 
             {/* ALL row */}
