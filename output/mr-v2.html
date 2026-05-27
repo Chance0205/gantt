@@ -2276,12 +2276,39 @@ function GanttGrid(props) {
             onMouseDown={startPan}
             style={{ position: "relative", height: totalRowsHeight, cursor: depDrag ? "crosshair" : "grab" }}>
             
-            {/* week lines */}
-            {weeks.map((w, idx) =>
-            <div key={idx} style={{
-              position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
-              background: "var(--line)", pointerEvents: "none"
-            }} />
+            {/* grid lines — zoom에 맞춰 헤더와 동일한 기준으로 */}
+            {zoomLevel === "month12" ? (
+              /* month12: 월 경계선 */
+              months.map((m, idx) =>
+                <div key={idx} style={{
+                  position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
+                  background: "var(--line)", pointerEvents: "none"
+                }} />
+              )
+            ) : zoomLevel === "month1" ? (
+              /* month1: 월 경계(실선) + 주 경계(점선) */
+              <>
+                {weeks.map((w, idx) =>
+                  <div key={`w${idx}`} style={{
+                    position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
+                    background: "var(--line-2)", pointerEvents: "none"
+                  }} />
+                )}
+                {months.map((m, idx) =>
+                  <div key={`m${idx}`} style={{
+                    position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
+                    background: "var(--line)", pointerEvents: "none"
+                  }} />
+                )}
+              </>
+            ) : (
+              /* month4: 주 기준 (기존과 동일) */
+              weeks.map((w, idx) =>
+                <div key={idx} style={{
+                  position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
+                  background: "var(--line)", pointerEvents: "none"
+                }} />
+              )
             )}
 
             {/* row tinting + separators */}
