@@ -1276,6 +1276,12 @@ function GanttGrid(props) {
     }
   }, [todayX, scrollWrapRef]);
 
+  // 자동완성 후보: 기존 태스크명 중 중복 제거
+  const namesuggestions = useMemo(
+    () => [...new Set(rows.map((r) => r.name).filter(Boolean))],
+    [rows]
+  );
+
   const colorFor = (code) => rootInfo(code).color;
 
   return (
@@ -1355,6 +1361,7 @@ function GanttGrid(props) {
                   <EditableText
                     value={r.name}
                     onCommit={(v) => updateItem(r.id, { name: v })}
+                    suggestions={namesuggestions}
                     style={{
                       fontSize: lvl === 1 ? 15 : 12.5,
                       fontWeight: lvl <= 2 ? 600 : 400,
@@ -1976,41 +1983,80 @@ function PctChip({ pct, editable, onChange }) {
 
 }
 
-function EditableText({ value, onCommit, style, multiline }) {
+function EditableText({ value, onCommit, style, multiline, suggestions }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
+  const [activeIdx, setActiveIdx] = useState(-1);
   useEffect(() => { setVal(value); }, [value]);
 
-  const commit = () => {
+  const filtered = (editing && val && suggestions)
+    ? suggestions.filter((s) => s !== value && s.toLowerCase().includes(val.toLowerCase())).slice(0, 7)
+    : [];
+
+  const commit = (v) => {
     setEditing(false);
-    const v = (val || "").trim();
-    if (!v) { setVal(value); return; }
-    if (v !== value) onCommit(v);
+    setActiveIdx(-1);
+    const trimmed = ((v !== undefined ? v : val) || "").trim();
+    if (!trimmed) { setVal(value); return; }
+    if (trimmed !== value) onCommit(trimmed);
+    else setVal(value);
   };
 
   if (editing) {
     return (
-      <input
-        type="text" value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
-          else if (e.key === "Escape") { setVal(value); setEditing(false); }
-          e.stopPropagation();
-        }}
-        onClick={(e) => e.stopPropagation()}
+      <div style={{ position: "relative", width: "100%" }}
         onMouseDown={(e) => e.stopPropagation()}
-        autoFocus
-        style={{
-          ...style,
-          fontSize: style && style.fontSize ? style.fontSize : 13,
-          padding: "1px 4px",
-          border: "1px solid var(--accent)", background: "var(--paper)",
-          color: "var(--ink)", borderRadius: 2, outline: "none",
-          width: "100%", boxSizing: "border-box",
-        }}
-      />
+        onClick={(e) => e.stopPropagation()}>
+        <input
+          type="text" value={val}
+          onChange={(e) => { setVal(e.target.value); setActiveIdx(-1); }}
+          onBlur={() => commit()}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, filtered.length - 1)); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
+            else if (e.key === "Enter") {
+              e.preventDefault();
+              commit(activeIdx >= 0 && filtered[activeIdx] ? filtered[activeIdx] : undefined);
+            }
+            else if (e.key === "Tab" && filtered.length > 0) {
+              e.preventDefault();
+              commit(activeIdx >= 0 ? filtered[activeIdx] : filtered[0]);
+            }
+            else if (e.key === "Escape") { setVal(value); setEditing(false); }
+            e.stopPropagation();
+          }}
+          autoFocus
+          style={{
+            ...style,
+            fontSize: style && style.fontSize ? style.fontSize : 13,
+            padding: "1px 4px",
+            border: "1px solid var(--accent)", background: "var(--paper)",
+            color: "var(--ink)", borderRadius: 2, outline: "none",
+            width: "100%", boxSizing: "border-box",
+          }}
+        />
+        {filtered.length > 0 && (
+          <div style={{
+            position: "absolute", top: "100%", left: 0, zIndex: 200, marginTop: 2,
+            background: "var(--paper-2)", border: "1px solid var(--line)",
+            borderRadius: 3, boxShadow: "0 8px 20px -6px rgba(0,0,0,0.22)",
+            minWidth: "100%", whiteSpace: "nowrap",
+          }}>
+            {filtered.map((s, i) => (
+              <div key={s}
+                onMouseDown={(e) => { e.preventDefault(); commit(s); }}
+                onMouseEnter={() => setActiveIdx(i)}
+                onMouseLeave={() => setActiveIdx(-1)}
+                style={{
+                  padding: "5px 10px", fontSize: 11.5, cursor: "pointer",
+                  fontFamily: "IBM Plex Mono, monospace",
+                  background: i === activeIdx ? "var(--ink)" : "transparent",
+                  color: i === activeIdx ? "var(--paper)" : "var(--ink-2)",
+                }}>{s}</div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
   return (
