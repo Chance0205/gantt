@@ -917,8 +917,58 @@ function App() {
     return (saved && saved.collapsed) || {};
   });
 
-  // Persist on every change.
+  // Persist on every change (localStorage).
   useEffect(() => { saveToStorage(items, collapsed, meta); }, [items, collapsed, meta]);
+
+  // ── Auto-save to local save server ───────────────────────────────────
+  const SAVE_FILENAME = STORAGE_KEY + '.json';
+  const [saveStatus, setSaveStatus] = useState('offline'); // 'offline'|'saving'|'saved'
+  const autoSaveTimer = useRef(null);
+
+  // On mount: try to load server save file (may be newer than localStorage, e.g. different browser)
+  useEffect(() => {
+    fetch('/' + SAVE_FILENAME)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data || !data.items) return;
+        const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
+        const localRaw = localStorage.getItem(STORAGE_KEY);
+        const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
+        if (serverTime >= localTime) {
+          const restored = deserializeItems(data.items);
+          if (restored) {
+            setItems(restored);
+            if (data.collapsed) setCollapsed(data.collapsed);
+            if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
+            setSaveStatus('saved');
+          }
+        }
+      })
+      .catch(() => { /* server not running — 그냥 localStorage 사용 */ });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced auto-save: 1.5초 후 서버에 저장
+  useEffect(() => {
+    clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      const payload = JSON.stringify({
+        version: 1,
+        savedAt: new Date().toISOString(),
+        items: serializeItems(items),
+        collapsed,
+        meta,
+      });
+      setSaveStatus('saving');
+      fetch('/save?file=' + SAVE_FILENAME, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      })
+        .then((r) => setSaveStatus(r.ok ? 'saved' : 'offline'))
+        .catch(() => setSaveStatus('offline'));
+    }, 1500);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [items, collapsed, meta]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Export current state as a JSON file the user can keep.
   const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta), [items, collapsed, meta]);
@@ -1337,7 +1387,7 @@ function App() {
   return (
     <div>
       <Masthead stats={stats} meta={meta} updateMeta={updateMeta} />
-      <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} />
+      <Toolbar v={v} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} />
       <div style={{
         background: "var(--paper-2)",
         border: "1px solid var(--line)",
@@ -1472,7 +1522,25 @@ function Stat({ label, value, accent }) {
 
 }
 
-function Toolbar({ v, setTweak, onExport, onImport, onReset }) {
+function SaveIndicator({ status }) {
+  const map = {
+    offline: { dot: "var(--ink-4)", label: "Offline" },
+    saving:  { dot: "#f59e0b",      label: "Saving…" },
+    saved:   { dot: "#22c55e",      label: "Saved"   },
+  };
+  const { dot, label } = map[status] || map.offline;
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 5,
+      fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.06em",
+      color: "var(--ink-3)", userSelect: "none" }}
+      title={status === "offline" ? "save-server.py 실행 시 자동 저장 활성화" : "로컬 파일에 자동 저장 중"}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
+      {label}
+    </span>
+  );
+}
+
+function Toolbar({ v, setTweak, onExport, onImport, onReset, saveStatus }) {
   const fileRef = useRef(null);
   return (
     <div style={{
@@ -1483,6 +1551,8 @@ function Toolbar({ v, setTweak, onExport, onImport, onReset }) {
       <Seg label="Zoom" value={v.zoom || "month4"} options={[["month1", "1 mo"], ["month4", "4 mo"], ["month12", "12 mo"]]} onChange={(x) => setTweak("zoom", x)} />
       <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
       <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+        <SaveIndicator status={saveStatus} />
+        <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
         <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
