@@ -58,7 +58,6 @@ body {
 }
 
 #root {
-  padding: 36px 44px 56px;
-  max-width: 1480px;
-  margin: 0 auto;
+  padding: 36px 32px 56px;
+  max-width: none;
 }
