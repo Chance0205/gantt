@@ -543,12 +543,23 @@ function App() {
   const addNewTask = useCallback((afterId) => {
     const id = `new-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setItems((items) => {
-      // 기준 행 탐색: afterId → 없으면 마지막 행
-      const refId = afterId ?? (items.length > 0 ? items[items.length - 1].id : null);
+      // afterId 없으면 → 최상위(level 1)로 맨 끝에 추가
+      if (!afterId) {
+        const newItem = {
+          id, level: 1, name: "New task",
+          owner: "KE",
+          start: addDays(TODAY, 1),
+          end: addDays(TODAY, 8),
+          pct: 0,
+        };
+        return [...items, newItem];
+      }
+
       let insertIdx = items.length;
-      let level = 3;
+      let level = 1;
       let owner = "KE";
 
+      const refId = afterId;
       if (refId) {
         const idx = items.findIndex((it) => it.id === refId);
         if (idx >= 0) {
@@ -1408,7 +1419,7 @@ function GanttGrid(props) {
 
           {/* + New task button */}
           <button
-            onClick={() => addNewTask(focusId)}
+            onClick={() => addNewTask(null)}
             style={{
               display: "flex", alignItems: "center", gap: 8,
               width: "100%", border: "none", borderTop: "1px solid var(--line)",
@@ -1420,7 +1431,7 @@ function GanttGrid(props) {
             onMouseEnter={(e) => {e.currentTarget.style.background = "var(--paper-3)";e.currentTarget.style.color = "var(--ink)";}}
             onMouseLeave={(e) => {e.currentTarget.style.background = "transparent";e.currentTarget.style.color = "var(--ink-3)";}}>
             <span style={{ fontSize: 16, lineHeight: 1, color: "var(--accent)" }}>+</span>
-            <span>New task{focusId ? ` (Lv ${(rows.find(r => r.id === focusId) || {}).level || ""})` : ""}</span>
+            <span>New task</span>
           </button>
         </div>
       </div>
