@@ -599,21 +599,41 @@ function App() {
     }));
   }, []);
 
-  // Delete-key + Esc handling for selected dependency
+  // 태스크 삭제 (하위 subtree 전체 + 해당 id를 참조하는 deps도 정리)
+  const deleteItem = useCallback((id) => {
+    setItems((items) => {
+      const idx = items.findIndex((it) => it.id === id);
+      if (idx < 0) return items;
+      const [start, end] = subtreeRange(items, idx);
+      const deletedIds = new Set(items.slice(start, end + 1).map((it) => it.id));
+      return items
+        .filter((_, i) => i < start || i > end)
+        .map((it) => ({ ...it, deps: (it.deps || []).filter((d) => !deletedIds.has(d)) }));
+    });
+    setFocusId((f) => (f === id ? null : f));
+  }, [setFocusId]);
+
+  // Delete-key + Esc handling for selected dependency / focused row
   useEffect(() => {
     const onKey = (e) => {
+      // 입력 중에는 삭제 단축키 무시
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       if ((e.key === "Delete" || e.key === "Backspace") && selectedDep) {
         e.preventDefault();
         removeDep(selectedDep.fromId, selectedDep.toId);
         setSelectedDep(null);
+      } else if (e.key === "Delete" && focusId) {
+        e.preventDefault();
+        deleteItem(focusId);
       } else if (e.key === "Escape") {
         setSelectedDep(null);
         setDepMenu(null);
+        setFocusId(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedDep, removeDep]);
+  }, [selectedDep, focusId, removeDep, deleteItem]);
 
   // Click outside dep arrow / context menu to clear
   useEffect(() => {
@@ -899,7 +919,8 @@ function App() {
           depMenu={depMenu}
           setDepMenu={setDepMenu}
           addNewTask={addNewTask}
-          updateItem={updateItem} />
+          updateItem={updateItem}
+          deleteItem={deleteItem} />
         
       </div>
       <Footer />
@@ -1184,7 +1205,7 @@ function GanttGrid(props) {
     collapsed, toggleCollapsed,
     startBarDrag, startDepDrag, startRowDrag, startPan,
     dragPreview, depDrag, rowDrag, scrollWrapRef,
-    removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem
+    removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, deleteItem
   } = props;
 
   const headerH = 56;
@@ -1319,7 +1340,7 @@ function GanttGrid(props) {
                 <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>}
                 <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
 
-                {/* 행별 + 버튼 (hover 시 표시) */}
+                {/* 행별 + / ✕ 버튼 (hover 시 표시) */}
                 <span
                   onClick={(e) => { e.stopPropagation(); addNewTask(r.id); }}
                   title={`Level ${r.level} 태스크를 아래에 추가`}
@@ -1334,6 +1355,28 @@ function GanttGrid(props) {
                     fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
                     background: "var(--paper-2)", marginLeft: -2,
                   }}>+</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (r.isSummary && r.leafCount > 0) {
+                      if (!confirm(`"${r.name}" 및 하위 ${r.leafCount}개 태스크를 모두 삭제할까요?`)) return;
+                    }
+                    deleteItem(r.id);
+                  }}
+                  title="태스크 삭제 (Delete 키)"
+                  style={{
+                    opacity: isHover ? 1 : 0,
+                    pointerEvents: isHover ? "auto" : "none",
+                    transition: "opacity 120ms",
+                    width: 16, height: 16, flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 2, border: "1px solid var(--line-2)",
+                    color: "var(--ink-3)", fontSize: 11, cursor: "pointer",
+                    lineHeight: 1, background: "var(--paper-2)", marginLeft: -2,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#c44b3d"; e.currentTarget.style.borderColor = "#c44b3d"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ink-3)"; e.currentTarget.style.borderColor = "var(--line-2)"; }}
+                >✕</span>
 
               </div>);
 
