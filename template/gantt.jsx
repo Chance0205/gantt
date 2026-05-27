@@ -1789,36 +1789,10 @@ function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeav
         borderTop: `6px solid ${color}`
       }} />
 
-      {isHover &&
-      <SummaryTooltip r={r} color={color} rowH={rowH} />
-      }
     </div>);
 
 }
 
-function SummaryTooltip({ r, color, rowH }) {
-  return (
-    <div style={{
-      position: "absolute", left: 0, top: rowH / 2 + 10, width: 290,
-      background: "var(--ink)", color: "var(--paper)",
-      padding: "10px 12px", borderRadius: 3,
-      zIndex: 12, pointerEvents: "none",
-      boxShadow: "0 14px 30px -10px rgba(0,0,0,0.4)"
-    }}>
-      <div className="mono small-caps" style={{ color, filter: "brightness(1.6)" }}>
-        {r.code} · {rootInfo(r.code).name}
-      </div>
-      <div className="serif" style={{ fontSize: 18, lineHeight: 1.2, marginTop: 4 }}>{r.name}</div>
-      <div className="mono" style={{ fontSize: 11, color: "var(--paper-3)", marginTop: 6 }}>
-        {fmtLong(r.start)} → {fmtLong(r.end)}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5 }}>
-        <span>Summary · {r.leafCount} leaves</span>
-        <span className="mono">{r.pct}%</span>
-      </div>
-    </div>);
-
-}
 
 function LeafBar({ r, x, y, w, h, color, isHover, isFocus, onEnter, onLeave, onBarDown, onDepDown, isPreview, previewStart, previewEnd }) {
   const { owners: ctxOwners } = React.useContext(OwnersCtx);
@@ -1918,28 +1892,6 @@ function LeafBar({ r, x, y, w, h, color, isHover, isFocus, onEnter, onLeave, onB
           transition: "opacity 120ms ease, background 120ms ease",
         }} />
 
-      {/* tooltip */}
-      {(isHover || isPreview) &&
-      <div style={{
-        position: "absolute", left: 0, top: h + 8, width: 290,
-        background: "var(--ink)", color: "var(--paper)",
-        padding: "10px 12px", borderRadius: 3,
-        zIndex: 12, pointerEvents: "none",
-        boxShadow: "0 14px 30px -10px rgba(0,0,0,0.4)"
-      }}>
-          <div className="mono small-caps" style={{ color, filter: "brightness(1.6)" }}>
-            {r.code} · {rootInfo(r.code).name}
-          </div>
-          <div className="serif" style={{ fontSize: 18, lineHeight: 1.2, marginTop: 4 }}>{r.name}</div>
-          <div className="mono" style={{ fontSize: 11, color: "var(--paper-3)", marginTop: 6 }}>
-            {fmtLong(previewStart || r.start)} → {fmtLong(previewEnd || r.end)} · {dayDiff(previewStart || r.start, previewEnd || r.end)}d
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11.5 }}>
-            <span>{o.name} · <span style={{ color: "var(--paper-3)" }}>{o.role}</span></span>
-            <span className="mono">{r.pct}%</span>
-          </div>
-        </div>
-      }
     </div>);
 
 }
