@@ -2444,13 +2444,21 @@
 
                 {/* grid lines + 주말 배경 — zoom에 맞춰 */}
                 {zoomLevel === "month12" ? (
-                  /* month12: 월 경계선 */
-                  months.map((m, idx) =>
-                    <div key={idx} style={{
-                      position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
-                      background: "var(--line)", pointerEvents: "none"
-                    }} />
-                  )
+                  /* month12: 주 경계 점선 + 월 경계 실선 */
+                  <>
+                    {weeks.map((w, idx) =>
+                      <div key={`w${idx}`} style={{
+                        position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
+                        background: "var(--line-2)", pointerEvents: "none"
+                      }} />
+                    )}
+                    {months.map((m, idx) =>
+                      <div key={idx} style={{
+                        position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
+                        background: "var(--line)", pointerEvents: "none"
+                      }} />
+                    )}
+                  </>
                 ) : (
                   /* month1: 주말 배경 + 주 경계(점선) + 월 경계(실선) */
                   <>
