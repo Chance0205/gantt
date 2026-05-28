@@ -1566,7 +1566,7 @@ function App() {
     const total = leaves.length;
     const done = leaves.filter((r) => r.pct === 100).length;
     const inflight = leaves.filter((r) => r.pct > 0 && r.pct < 100).length;
-    const overall = Math.round(leaves.reduce((s, r) => s + r.pct, 0) / total);
+    const overall = total === 0 ? 0 : Math.round(leaves.reduce((s, r) => s + (isNaN(r.pct) ? 0 : r.pct), 0) / total);
     return { total, done, inflight, overall, summaries: enriched.length - total };
   }, [enriched]);
 
