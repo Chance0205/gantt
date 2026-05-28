@@ -1190,12 +1190,24 @@
       // Visible filter: by owner (keep ancestor summaries) + by collapse (hide descendants of collapsed summaries)
       const visibleRows = useMemo(() => {
         // 1) ownership pass
+        const vendorIds = new Set(Object.keys(vendors));
+        const internalIds = new Set(teams.flatMap((t) => t.members));
         let keepIds = new Set(enriched.map((r) => r.id));
-        if (v.owner !== "all") {
-          const team = TEAMS.find((t) => t.id === v.owner);
-          const matchOwner = team
-            ? (r) => (r.owners || []).some((o) => team.members.includes(o))
-            : (r) => (r.owners || []).includes(v.owner);
+        const isAll = v.owner === "all";
+        if (!isAll || vendorIds.size > 0) {
+          let matchOwner;
+          if (isAll) {
+            // "all" = internal teams only; exclude tasks with only vendor owners
+            matchOwner = (r) => {
+              const ow = r.owners || [];
+              return ow.length === 0 || ow.some((o) => internalIds.has(o));
+            };
+          } else {
+            const team = teams.find((t) => t.id === v.owner);
+            matchOwner = team
+              ? (r) => (r.owners || []).some((o) => team.members.includes(o))
+              : (r) => (r.owners || []).includes(v.owner);
+          }
           keepIds = new Set();
           enriched.forEach((r, i) => {
             if (!r.isSummary && matchOwner(r)) {
@@ -1225,7 +1237,7 @@
           if (r.isSummary && collapsed[r.id]) collapseAtLevel = r.level;
         });
         return out;
-      }, [enriched, v.owner, collapsed]);
+      }, [enriched, v.owner, collapsed, teams, vendors]);
 
       const rowIndex = useMemo(() => {
         const m = {};
