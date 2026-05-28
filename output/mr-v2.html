@@ -910,12 +910,14 @@
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) { }
     }
 
-    // Download items as a JSON file.
-    function downloadJSON(items, collapsed, meta) {
+    // Download items as a JSON file. (owners, teams 추가)
+    function downloadJSON(items, collapsed, meta, owners, teams) {
       const data = {
         items: serializeItems(items),
         collapsed,
         meta,
+        owners, // 추가
+        teams,  // 추가
         exportedAt: new Date().toISOString(),
         version: 1,
       };
@@ -1130,8 +1132,8 @@
           });
       }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      // Export current state as a JSON file the user can keep.
-      const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta), [items, collapsed, meta]);
+      // Export current state as a JSON file the user can keep. owners, teams 정보도 함께 저장하도록 수정. (기존 export 기능은 유지)
+      const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta, owners, teams), [items, collapsed, meta, owners, teams]);
 
       // Import a JSON file the user picks; merge { items, collapsed }.
       const importJSON = useCallback((file) => {
