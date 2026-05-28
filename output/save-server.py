@@ -215,7 +215,14 @@ if __name__ == '__main__':
         'OFF'
     )
 
-    httpd = HTTPServer(('localhost', PORT), GanttHandler)
+    try:
+        httpd = HTTPServer(('localhost', PORT), GanttHandler)
+    except OSError as e:
+        _log(f'  [ERROR] Port {PORT} is already in use: {e}')
+        _log(f'  [ERROR] 이미 서버가 실행 중이거나 다른 프로그램이 {PORT}번 포트를 사용 중입니다.')
+        _log(f'  [ERROR] 작업 표시줄에서 "Gantt Server" 창을 닫고 다시 시도하세요.')
+        input('  Press Enter to exit...')
+        sys.exit(1)
 
     _log(f'  Gantt save-server  http://localhost:{PORT}/mr-v2.html')
     _log(f'  git push: {push_st}  (delay {PUSH_DELAY}s)  |  Ctrl+C to stop')
