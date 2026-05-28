@@ -2438,13 +2438,13 @@ function GanttGrid(props) {
             {v.showDeps &&
             <svg style={{ position: "absolute", inset: 0, width: timelineW, height: totalRowsHeight, pointerEvents: "none", overflow: "visible" }}>
                 <defs>
-                  <marker id="arr" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                  <marker id="arr" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="7" markerHeight="7" orient="auto">
                     <path d="M0,0 L8,4 L0,8 z" fill="var(--ink-2)" />
                   </marker>
-                  <marker id="arr-soft" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                  <marker id="arr-soft" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="6" markerHeight="6" orient="auto">
                     <path d="M0,0 L8,4 L0,8 z" fill="var(--ink-4)" />
                   </marker>
-                  <marker id="arr-sel" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+                  <marker id="arr-sel" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" orient="auto">
                     <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)" />
                   </marker>
                 </defs>
@@ -2640,19 +2640,18 @@ function GanttGrid(props) {
 // elbow routing: horizontal-vertical-horizontal with a small dogleg.
 // BUFFER keeps the vertical line a comfortable distance away from the arrow head.
 function elbowPath(x1, y1, x2, y2) {
-  const BUFFER = 14;
-  const ARR_GAP = 6;
+  const BUFFER = 20;
   const dx = x2 - x1;
-  if (Math.abs(y2 - y1) < 1) return `M ${x1} ${y1} L ${x2 - ARR_GAP} ${y2}`;
+  if (Math.abs(y2 - y1) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
   // Backtrack route when target is behind source or too tight to elbow normally
   if (dx < BUFFER + 14) {
     const downY = (y1 + y2) / 2;
     const stub = 10;
-    return `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${downY} L ${x2 - BUFFER} ${downY} L ${x2 - BUFFER} ${y2} L ${x2 - ARR_GAP} ${y2}`;
+    return `M ${x1} ${y1} L ${x1 + stub} ${y1} L ${x1 + stub} ${downY} L ${x2 - BUFFER} ${downY} L ${x2 - BUFFER} ${y2} L ${x2} ${y2}`;
   }
   // Normal elbow: vertical clamped to ≥ BUFFER away from target
   const mid = Math.min(x1 + Math.max(10, dx / 2), x2 - BUFFER);
-  return `M ${x1} ${y1} L ${mid} ${y1} L ${mid} ${y2} L ${x2 - ARR_GAP} ${y2}`;
+  return `M ${x1} ${y1} L ${mid} ${y1} L ${mid} ${y2} L ${x2} ${y2}`;
 }
 
 // ====================================================================
