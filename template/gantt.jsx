@@ -460,8 +460,8 @@ function App() {
 
   // ── Auto-save to local save server ───────────────────────────────────
   const SAVE_FILENAME = STORAGE_KEY + '.json';
-  const [saveStatus, setSaveStatus] = useState('offline'); // 'offline'|'saving'|'saved'
-  const autoSaveTimer = useRef(null);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle'|'dirty'|'saving'|'saved'|'error'
+  const [isDirty, setIsDirty] = useState(false);
   const isHTTP = window.location.protocol === 'http:' || window.location.protocol === 'https:';
 
   // On mount: try to load server save file (may be newer than localStorage, e.g. different browser)
@@ -487,30 +487,34 @@ function App() {
       .catch(() => { /* server not running — 그냥 localStorage 사용 */ });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Debounced auto-save: 1.5초 후 서버에 저장
+  // 변경 감지 → dirty 표시
+  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (!isHTTP) return; // file:// 프로토콜에서는 skip
-    clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => {
-      const payload = JSON.stringify({
-        version: 1,
-        savedAt: new Date().toISOString(),
-        items: serializeItems(items),
-        collapsed,
-        meta,
-        owners,
-        teams,
-      });
-      setSaveStatus('saving');
-      fetch('/save?file=' + SAVE_FILENAME, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      })
-        .then((r) => setSaveStatus(r.ok ? 'saved' : 'offline'))
-        .catch(() => setSaveStatus('offline'));
-    }, 1500);
-    return () => clearTimeout(autoSaveTimer.current);
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setIsDirty(true);
+    setSaveStatus('dirty');
+  }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 수동 저장
+  const saveToServer = useCallback(() => {
+    if (!isHTTP) return;
+    const payload = JSON.stringify({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      items: serializeItems(items),
+      collapsed,
+      meta,
+      owners,
+      teams,
+    });
+    setSaveStatus('saving');
+    fetch('/save?file=' + SAVE_FILENAME, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    })
+      .then((r) => { if (r.ok) { setSaveStatus('saved'); setIsDirty(false); } else setSaveStatus('error'); })
+      .catch(() => setSaveStatus('error'));
   }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Export current state as a JSON file the user can keep.
@@ -1033,7 +1037,7 @@ function App() {
     <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
     <div>
       <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-      <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onTeam={() => setShowTeamModal(true)} />
+      <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} onTeam={() => setShowTeamModal(true)} />
       <div style={{
         background: "var(--paper-2)",
         border: "1px solid var(--line)",
@@ -1254,25 +1258,39 @@ function Stat({ label, value, accent }) {
 
 }
 
-function SaveIndicator({ status }) {
-  const map = {
-    offline: { dot: "var(--ink-4)", label: "Offline" },
-    saving:  { dot: "#f59e0b",      label: "Saving…" },
-    saved:   { dot: "#22c55e",      label: "Saved"   },
-  };
-  const { dot, label } = map[status] || map.offline;
+function SaveIndicator({ status, onSave, isHTTP }) {
+  const canSave = isHTTP && status === 'dirty';
+  const dot =
+    status === 'saved'  ? "#22c55e" :
+    status === 'dirty'  ? "#f59e0b" :
+    status === 'saving' ? "#f59e0b" :
+    status === 'error'  ? "#ef4444" : "var(--ink-4)";
+  const label =
+    status === 'saved'  ? "Saved" :
+    status === 'dirty'  ? "Unsaved" :
+    status === 'saving' ? "Saving…" :
+    status === 'error'  ? "Error" : "No server";
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 5,
-      fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.06em",
-      color: "var(--ink-3)", userSelect: "none" }}
-      title={status === "offline" ? "save-server.py 실행 시 자동 저장 활성화" : "로컬 파일에 자동 저장 중"}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
-      {label}
+    <span style={{ display: "flex", alignItems: "center", gap: 6, userSelect: "none" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 5,
+        fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.06em",
+        color: "var(--ink-3)" }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
+        {label}
+      </span>
+      {canSave && (
+        <button onClick={onSave} style={{
+          padding: "2px 10px", borderRadius: 3,
+          border: "1px solid var(--accent)", background: "var(--accent)",
+          color: "#fff", fontSize: 10.5, fontFamily: "IBM Plex Mono, monospace",
+          cursor: "pointer", letterSpacing: "0.04em"
+        }}>Save</button>
+      )}
     </span>
   );
 }
 
-function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onTeam }) {
+function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, onTeam }) {
   const fileRef = useRef(null);
   return (
     <div style={{
@@ -1283,7 +1301,7 @@ function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, save
       <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
       <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
       <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-        {isAdmin && <SaveIndicator status={saveStatus} />}
+        {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} />}
         <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
         <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
         {isAdmin && <>
