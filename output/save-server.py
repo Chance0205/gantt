@@ -123,6 +123,18 @@ def schedule_push(filename):
 
 class GanttHandler(SimpleHTTPRequestHandler):
 
+    def do_GET(self):
+        if self.path == '/ping':
+            resp = b'{"ok":true}'
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+            return
+        super().do_GET()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self._cors()
@@ -184,7 +196,7 @@ class GanttHandler(SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
 
     def log_message(self, fmt, *args):
-        if args and str(args[0]).startswith('GET'):
+        if args and str(args[0]).startswith('GET') and '/ping' not in str(args[0]):
             return
         super().log_message(fmt, *args)
 

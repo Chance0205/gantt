@@ -1062,23 +1062,41 @@ function App() {
   // 수동 저장
   const saveToServer = useCallback(() => {
     if (!isHTTP) return;
-    const payload = JSON.stringify({
-      version: 1,
-      savedAt: new Date().toISOString(),
-      items: serializeItems(items),
-      collapsed,
-      meta,
-      owners,
-      teams,
-    });
+    let payload;
+    try {
+      payload = JSON.stringify({
+        version: 1,
+        savedAt: new Date().toISOString(),
+        items: serializeItems(items),
+        collapsed,
+        meta,
+        owners,
+        teams,
+      });
+    } catch (e) {
+      console.error('[Save] JSON.stringify failed:', e);
+      setSaveStatus('error');
+      return;
+    }
     setSaveStatus('saving');
-    fetch('/save?file=' + SAVE_FILENAME, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    })
-      .then((r) => { if (r.ok) { setSaveStatus('saved'); setIsDirty(false); } else setSaveStatus('error'); })
-      .catch(() => setSaveStatus('error'));
+    fetch('/ping')
+      .then((r) => {
+        if (!r.ok) throw new Error('ping-fail');
+        return fetch('/save?file=' + SAVE_FILENAME, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        });
+      })
+      .then((r) => {
+        if (r.ok) { setSaveStatus('saved'); setIsDirty(false); }
+        else { console.error('[Save] server returned', r.status); setSaveStatus('error'); }
+      })
+      .catch((err) => {
+        console.error('[Save] network error:', err.message,
+          '— 서버 창(Gantt Server)에서 에러 로그를 확인하세요.');
+        setSaveStatus('error');
+      });
   }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Export current state as a JSON file the user can keep.
