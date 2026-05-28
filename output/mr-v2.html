@@ -771,10 +771,20 @@
       return end + 1;
     }
 
-    // Color & name for a top-level WBS code, with a fallback for ad-hoc tasks (codes beyond the predefined roots).
-    const FALLBACK_ROOT = { name: "Custom task", color: "var(--ink-3)" };
+    // Color & name for a top-level WBS code. Cycles through a 16-color palette for roots not in ROOTS config.
+    const ROOT_PALETTE = [
+      "#46555f", "#8a3a1f", "#c89a6e",
+      "#2e7d5c", "#1a5fa8", "#7b4fa0",
+      "#c94c6a", "#8b7014", "#2d7a8a",
+      "#a05928", "#4a6b3a", "#5a3a6b",
+      "#6b4a2a", "#2a5a6b", "#8b3a5a",
+      "#3a6b5a",
+    ];
     function rootInfo(code) {
-      return ROOTS[code.split(".")[0]] || FALLBACK_ROOT;
+      const key = code ? code.split(".")[0] : "";
+      if (ROOTS[key]) return ROOTS[key];
+      const idx = Math.max(0, (parseInt(key, 10) || 1) - 1);
+      return { name: "Custom task", color: ROOT_PALETTE[idx % ROOT_PALETTE.length] };
     }
 
     // ====================================================================
