@@ -1070,10 +1070,7 @@
         const saved = loadFromStorage();
         return (saved && saved.collapsed) || {};
       });
-      const [vendors, setVendors] = useState(() => {
-        const saved = loadFromStorage();
-        return (saved && saved.vendors) || {};
-      });
+
 
       // Persist on every change (localStorage).
       useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams, vendors); }, [items, collapsed, meta, owners, teams, vendors]);
