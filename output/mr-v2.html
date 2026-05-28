@@ -2686,7 +2686,8 @@ function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeav
       }} />
       <div style={{
         position: "absolute", top: "50%", transform: "translateY(-50%)", right: -4,
-        width: 8, height: 8, borderRadius: 99, background: color
+        width: 8, height: 8, borderRadius: 99, background: color,
+        opacity: r.pct >= 100 ? 1 : 0.45
       }} />
 
     </div>);
