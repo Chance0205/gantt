@@ -1644,7 +1644,7 @@
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
               borderRadius: 4,
-              overflow: "hidden",
+              overflow: "clip",
               boxShadow: "0 1px 0 rgba(28,25,22,0.04), 0 24px 60px -40px rgba(28,25,22,0.18)"
             }}>
               <GanttGrid
@@ -2189,7 +2189,7 @@
         <div style={{ display: "grid", gridTemplateColumns: `${leftW}px 1fr`, position: "relative" }}>
           {/* LEFT */}
           <div style={{ borderRight: "1px solid var(--line)", background: "var(--paper-2)" }}>
-            <div style={{ height: headerH, borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", padding: "0 12px", gap: 6 }}>
+            <div style={{ height: headerH, borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", padding: "0 12px", gap: 6, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
               <span style={{ width: 14 }} />
               <span style={{ width: 14 }} />
               <span className="mono small-caps" style={{ color: "var(--ink-3)", minWidth: 36, paddingLeft: 8 }}>WBS</span>
@@ -2377,10 +2377,10 @@
           </div>
 
           {/* RIGHT — scrollable */}
-          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "hidden", position: "relative" }}>
+          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "clip", position: "relative" }}>
             <div style={{ width: timelineW, position: "relative" }}>
               {/* HEADER */}
-              <div style={{ height: headerH, borderBottom: "1px solid var(--line)", position: "relative" }}>
+              <div style={{ height: headerH, borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
                 <div style={{ position: "absolute", inset: 0, height: 24, borderBottom: "1px solid var(--line)" }}>
                   {months.map((m, idx) => {
                     const next = months[idx + 1];
