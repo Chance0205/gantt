@@ -1,6 +1,4 @@
 @echo off
-cd /d "%~dp0output"
-start /b pythonw save-server.py
-echo Server started (running in background)
-echo To stop: open Task Manager and end the pythonw.exe process
+start "Gantt Server" /min python "%~dp0output\save-server.py"
+echo Server started. Check taskbar for "Gantt Server" window.
 pause
