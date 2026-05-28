@@ -891,7 +891,8 @@
       }
     }
 
-    function saveToStorage(items, collapsed, meta, owners, teams) {
+    // vendors 추가
+    function saveToStorage(items, collapsed, meta, owners, teams, vendors) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           items: serializeItems(items),
@@ -899,6 +900,7 @@
           meta,
           owners,
           teams,
+          vendors, // 추가
           _savedAt: new Date().toISOString(),
         }));
       } catch (e) {
@@ -910,14 +912,15 @@
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) { }
     }
 
-    // Download items as a JSON file. (owners, teams 추가)
-    function downloadJSON(items, collapsed, meta, owners, teams) {
+    // Download items as a JSON file. (owners, teams, vendors 추가)
+    function downloadJSON(items, collapsed, meta, owners, teams, vendors) {
       const data = {
         items: serializeItems(items),
         collapsed,
         meta,
         owners, // 추가
         teams,  // 추가
+        vendors, // 추가
         exportedAt: new Date().toISOString(),
         version: 1,
       };
@@ -983,12 +986,39 @@
       });
       const [showTeamModal, setShowTeamModal] = useState(false);
 
+      // 👇============== 외주사(Vendor) 전용 State 추가 ==============👇
+      const [vendors, setVendors] = useState(() => {
+        const saved = loadFromStorage();
+        return (saved && saved.vendors) ? saved.vendors : {
+          "UNO": { name: "Design UNO", role: "Exterior", tint: "#5b8c5a" } // 초기 샘플
+        };
+      });
+      const [showVendorModal, setShowVendorModal] = useState(false);
+
+      const updateVendorData = useCallback((newVendors, renames = {}) => {
+        setVendors(newVendors);
+        if (Object.keys(renames).length > 0) {
+          setItems((prev) => prev.map((it) => ({
+            ...it,
+            owners: (it.owners || []).map((id) => renames[id] ?? id),
+          })));
+        }
+      }, []);
+      // 👆===========================================================👆
+
       // 전역 OWNERS/TEAMS 동기화 (직접 참조하는 코드용)
       useEffect(() => {
         Object.keys(OWNERS).forEach((k) => delete OWNERS[k]);
-        Object.assign(OWNERS, owners);
-        TEAMS.splice(0, TEAMS.length, ...teams);
-      }, [owners, teams]);
+        // 내부 팀원(owners)과 외주 회사(vendors)를 하나의 인력 풀로 병합
+        Object.assign(OWNERS, owners, vendors);
+        // 외주 회사들을 "VENDOR"라는 하나의 가상 팀으로 묶어서 필터에 꽂아줌
+        const vendorTeam = {
+          id: "VENDOR_TEAM",
+          name: "Vendor",
+          members: Object.keys(vendors)
+        };
+        TEAMS.splice(0, TEAMS.length, ...teams, vendorTeam);
+      }, [owners, teams, vendors]);
 
       const updateTeamData = useCallback((newOwners, newTeams, renames = {}) => {
         setOwners(newOwners);
@@ -1040,9 +1070,13 @@
         const saved = loadFromStorage();
         return (saved && saved.collapsed) || {};
       });
+      const [vendors, setVendors] = useState(() => {
+        const saved = loadFromStorage();
+        return (saved && saved.vendors) || {};
+      });
 
       // Persist on every change (localStorage).
-      useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams); }, [items, collapsed, meta, owners, teams]);
+      useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams, vendors); }, [items, collapsed, meta, owners, teams, vendors]);
 
       // ── Auto-save to local save server ───────────────────────────────────
       const SAVE_FILENAME = STORAGE_KEY + '.json';
@@ -1090,7 +1124,7 @@
         if (isFirstRender.current) { isFirstRender.current = false; return; }
         setIsDirty(true);
         setSaveStatus('dirty');
-      }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
+      }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
 
       // 수동 저장
       const saveToServer = useCallback(() => {
@@ -1105,6 +1139,7 @@
             meta,
             owners,
             teams,
+            vendors, // 외주사 정보도 함께 저장
           });
         } catch (e) {
           console.error('[Save] JSON.stringify failed:', e);
@@ -1130,10 +1165,10 @@
               '— 서버 창(Gantt Server)에서 에러 로그를 확인하세요.');
             setSaveStatus('error');
           });
-      }, [items, collapsed, meta, owners, teams]); // eslint-disable-line react-hooks/exhaustive-deps
+      }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      // Export current state as a JSON file the user can keep. owners, teams 정보도 함께 저장하도록 수정. (기존 export 기능은 유지)
-      const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta, owners, teams), [items, collapsed, meta, owners, teams]);
+      // Export current state as a JSON file the user can keep. owners, teams, vendors 정보도 함께 저장하도록 수정. (기존 export 기능은 유지)
+      const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta, owners, teams, vendors), [items, collapsed, meta, owners, teams, vendors]);
 
       // Import a JSON file the user picks; merge { items, collapsed }.
       const importJSON = useCallback((file) => {
@@ -1151,6 +1186,7 @@
             // 👇 여기에 팀원 목록(owners)과 팀(teams) 정보도 가져오도록 코드 추가 👇
             if (parsed.owners) setOwners(parsed.owners);
             if (parsed.teams) setTeams(parsed.teams);
+            if (parsed.vendors) setVendors(parsed.vendors); // 외주사 정보도 가져오기
           } catch (err) {
             alert("Could not parse JSON file: " + err.message);
           }
@@ -1650,7 +1686,7 @@
         <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} onTeam={() => setShowTeamModal(true)} />
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} /> // 팀 관리 버튼과 외주사 관리 버튼 추가
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -1699,6 +1735,8 @@
             </div>
             <Footer enriched={enriched} />
             {showTeamModal && <TeamModal owners={owners} teams={teams} onSave={updateTeamData} onClose={() => setShowTeamModal(false)} />}
+            {/* 👇 외주사 모달 노출 처리 추가 */}
+            {showVendorModal && <VendorModal vendors={vendors} onSave={updateVendorData} onClose={() => setShowVendorModal(false)} />}
             {pendingDelete && (
               <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
                 onClick={() => setPendingDelete(null)}>
@@ -1921,7 +1959,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, serverOnline, onTeam }) {
+    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, serverOnline, onTeam, onVendor }) { // onVendor 추가
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -1940,6 +1978,7 @@
               <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
                 onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImport(f); e.target.value = ""; }} />
               <ToolbarBtn onClick={onTeam} title="팀원 목록 편집">👥 Team</ToolbarBtn>
+              <ToolbarBtn onClick={onVendor} title="외주사 목록 편집">🏭 Vendor</ToolbarBtn>
               <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
               <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
               <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
@@ -3500,6 +3539,76 @@
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
               <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>취소</button>
               <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 리액트 엔트리 영역 위쪽에 배치해 주세요. vendormodal 추가
+    const VENDOR_PALETTE = ["#5b8c5a", "#3d7a8a", "#8a6a3d", "var(--slate)", "var(--clay)", "var(--plum)", "var(--rose)", "var(--olive)", "var(--accent)"];
+
+    function VendorModal({ vendors, onSave, onClose }) {
+      const [ev, setEv] = useState(() => JSON.parse(JSON.stringify(vendors)));
+      const [renames, setRenames] = useState({});
+
+      const updVendor = (id, patch) => setEv((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+      const renameVendor = (oldId, newId) => {
+        newId = newId.trim().toUpperCase();
+        if (!newId || newId === oldId || ev[newId]) return;
+        setRenames((prev) => ({ ...prev, [oldId]: newId }));
+        setEv((prev) => { const n = { ...prev, [newId]: { ...prev[oldId] } }; delete n[oldId]; return n; });
+      };
+
+      const delVendor = (id) => {
+        setEv((prev) => { const n = { ...prev }; delete n[id]; return n; });
+      };
+
+      const addVendor = () => {
+        const used = new Set(Object.values(ev).map((v) => v.tint));
+        const tint = VENDOR_PALETTE.find((c) => !used.has(c)) || VENDOR_PALETTE[0];
+        const id = "V" + Date.now().toString(36).slice(-3).toUpperCase();
+        setEv((prev) => ({ ...prev, [id]: { name: "", role: "", tint } }));
+      };
+
+      const handleSave = () => {
+        const cleaned = Object.fromEntries(Object.entries(ev).filter(([, v]) => v.name.trim()));
+        onSave(cleaned, renames);
+        onClose();
+      };
+
+      const inputStyle = { border: "none", borderBottom: "1px solid var(--line-2)", background: "transparent", outline: "none", fontFamily: "inherit", color: "var(--ink)", padding: "4px 0", width: "100%" };
+
+      return (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: 6, boxShadow: "0 24px 60px -16px rgba(0,0,0,0.3)", width: 460, maxHeight: "75vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid var(--line)" }}>
+              <span className="serif" style={{ fontSize: 20, flex: 1, color: "var(--ink)" }}>🏭 외주사/공급사 관리</span>
+              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 15 }}>✕</button>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: "20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "26px 50px 1fr 110px 24px", gap: 10, paddingBottom: 6, borderBottom: "1px solid var(--line)" }}>
+                {["", "코드", "회사명", "담당 업무/품목", ""].map((h, i) => (
+                  <span key={i} className="mono small-caps" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: "0.05em" }}>{h}</span>
+                ))}
+              </div>
+              {Object.entries(ev).map(([id, v]) => (
+                <div key={id} style={{ display: "grid", gridTemplateColumns: "26px 50px 1fr 110px 24px", gap: 10, alignItems: "center", padding: "6px 0", borderBottom: "1px dashed var(--line-2)" }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 3, background: v.tint, display: "inline-block" }} />
+                  <input defaultValue={id} onBlur={(e) => renameVendor(id, e.target.value)} style={{ ...inputStyle, fontFamily: "IBM Plex Mono", fontSize: 11, textAlign: "center" }} />
+                  <input value={v.name} onChange={(e) => updVendor(id, { name: e.target.value })} placeholder="회사명 입력" style={{ ...inputStyle, fontSize: 13 }} />
+                  <input value={v.role} onChange={(e) => updVendor(id, { role: e.target.value })} placeholder="예: 외장디자인" style={{ ...inputStyle, fontSize: 11, color: "var(--ink-3)" }} />
+                  <span onClick={() => delVendor(id)} style={{ cursor: "pointer", color: "var(--ink-4)", fontSize: 11, textAlign: "center" }} onMouseEnter={(e) => e.currentTarget.style.color = "#c44b3d"} onMouseLeave={(e) => e.currentTarget.style.color = "var(--ink-4)"}>✕</span>
+                </div>
+              ))}
+              <button onClick={addVendor} style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px dashed var(--line-2)", borderRadius: 3, width: "100%", padding: "8px", justifyContent: "center", cursor: "pointer", color: "var(--ink-4)", fontFamily: "IBM Plex Mono", fontSize: 11 }} onMouseEnter={(e) => e.currentTarget.style.borderColor = "var(--accent)"} onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--line-2)"}>
+                + 새 외주사 추가
+              </button>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
+              <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", fontSize: 11, cursor: "pointer" }}>취소</button>
+              <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontSize: 11, cursor: "pointer" }}>저장</button>
             </div>
           </div>
         </div>
