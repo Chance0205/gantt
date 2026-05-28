@@ -1079,6 +1079,7 @@ function App() {
           addNewTask={addNewTask}
           updateItem={updateItem}
           deleteItem={deleteItem}
+          setPendingDelete={setPendingDelete}
           setCtxMenu={setCtxMenu}
           deleteSegment={deleteSegment} />
 
@@ -1522,7 +1523,7 @@ function GanttGrid(props) {
     startBarDrag, startDepDrag, startRowDrag, startPan,
     dragPreview, depDrag, rowDrag, scrollWrapRef,
     removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, deleteItem,
-    setCtxMenu, deleteSegment
+    setPendingDelete, setCtxMenu, deleteSegment
   } = props;
 
   const { owners: ctxOwners } = React.useContext(OwnersCtx);
