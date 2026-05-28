@@ -2228,8 +2228,9 @@
                     }}
                     style={{
                       height: rowH, display: "flex", alignItems: "center", gap: 6,
-                      padding: `0 12px 0 ${10 + indent}px`,
+                      padding: `0 12px 0 ${7 + indent}px`,
                       borderBottom: "1px solid var(--line)",
+                      borderLeft: `3px solid ${rootColor}`,
                       background: isFocus ? "var(--paper-3)" :
                         isHover ? "rgba(232,221,198,0.5)" :
                           lvl === 1 ? "var(--paper-3)" :
@@ -2264,16 +2265,18 @@
                     <span className="mono"
                       onClick={(e) => { e.stopPropagation(); setDetailId(r.id); }}
                       style={{
-                        fontSize: lvl === 1 ? 13 : lvl === 2 ? 11 : 10.5,
-                        color: lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)",
-                        fontWeight: lvl <= 2 ? 600 : 400,
+                        fontSize: lvl === 1 ? 12 : lvl === 2 ? 10.5 : 10,
+                        color: rootColor,
+                        fontWeight: 700,
                         minWidth: 36, letterSpacing: 0.3,
-                        borderLeft: `2px solid ${rootColor}`,
-                        paddingLeft: 6,
+                        background: rootColor + "1a",
+                        padding: "2px 6px",
+                        borderRadius: 3,
                         cursor: "pointer",
+                        flexShrink: 0,
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
-                      onMouseLeave={(e) => e.currentTarget.style.color = lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)"}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = "0.7"}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
                     >{r.code}</span>
 
                     <div
@@ -2499,16 +2502,21 @@
                 {/* row tinting + separators */}
                 {rows.map((r, i) => {
                   const lvl = r.level;
-                  const bg = r.isSummary && lvl === 1 ? "var(--paper-3)" :
-                    r.isSummary && lvl === 2 ? "rgba(232,221,198,0.35)" : "transparent";
+                  const rowColor = colorFor(r.code);
+                  const levelBg = r.isSummary && lvl === 1 ? "var(--paper-3)" :
+                    r.isSummary && lvl === 2 ? "rgba(232,221,198,0.35)" : null;
                   return (
                     <React.Fragment key={r.id}>
-                      {bg !== "transparent" &&
+                      {levelBg &&
                         <div style={{
                           position: "absolute", top: i * rowH, left: 0, right: 0, height: rowH,
-                          background: bg, pointerEvents: "none"
+                          background: levelBg, pointerEvents: "none"
                         }} />
                       }
+                      <div style={{
+                        position: "absolute", top: i * rowH, left: 0, right: 0, height: rowH,
+                        background: rowColor + "0c", pointerEvents: "none"
+                      }} />
                       <div style={{
                         position: "absolute", left: 0, right: 0, top: (i + 1) * rowH - 1,
                         height: 1, background: "var(--line)", pointerEvents: "none"
