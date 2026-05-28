@@ -2033,6 +2033,7 @@ function GanttGrid(props) {
                 const usePreview = dragPreview && dragPreview.id === r.id && dragPreview.segIdx === segIdx;
                 const segStart = usePreview ? dragPreview.start : seg.start;
                 const segEnd = usePreview ? dragPreview.end : seg.end;
+                if (!segStart || !segEnd) return null;
                 const x = dayDiff(viewStart, segStart) * dayW;
                 const w = Math.max(dayW * 0.7, dayDiff(segStart, segEnd) * dayW);
                 const fillFraction = computeSegFill(segs, segIdx, r.pct);
