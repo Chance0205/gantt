@@ -1264,12 +1264,14 @@ function SaveIndicator({ status, onSave, isHTTP }) {
     status === 'saved'  ? "#22c55e" :
     status === 'dirty'  ? "#f59e0b" :
     status === 'saving' ? "#f59e0b" :
-    status === 'error'  ? "#ef4444" : "var(--ink-4)";
+    status === 'error'  ? "#ef4444" :
+    isHTTP              ? "#22c55e" : "var(--ink-4)";
   const label =
     status === 'saved'  ? "Saved" :
     status === 'dirty'  ? "Unsaved" :
     status === 'saving' ? "Saving…" :
-    status === 'error'  ? "Error" : "No server";
+    status === 'error'  ? "Error" :
+    isHTTP              ? "Synced" : "No server";
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, userSelect: "none" }}>
       <span style={{ display: "flex", alignItems: "center", gap: 5,
