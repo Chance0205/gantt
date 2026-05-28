@@ -6,7 +6,7 @@ Gantt Chart 로컬 저장 서버  (자동 git push 포함)
 접속:    http://localhost:8080/mr-v2.html
 
 동작:
-  1. 브라우저에서 변경 → 1.5초 후 .json 파일에 자동 저장
+  1. 브라우저에서 Save 버튼 클릭 → .json 파일에 저장
   2. 저장 후 10초 대기 → GitHub에 자동 커밋 + 푸시
 
 설정 (아래 상수로 조정):
@@ -23,8 +23,25 @@ import sys
 import threading
 import time
 
-# Windows에서 subprocess 호출 시 cmd 창이 깜빡이지 않도록
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+# ── Windows CMD 창 억제 ───────────────────────────────────────────────
+# CREATE_NO_WINDOW = 0x08000000 직접 사용 (Python 3.7 미만 호환)
+_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
+if sys.platform == "win32":
+    _STARTUP = subprocess.STARTUPINFO()
+    _STARTUP.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    _STARTUP.wShowWindow = 0  # SW_HIDE
+else:
+    _STARTUP = None
+
+def _run(*args, **kwargs):
+    """subprocess.run wrapper — Windows에서 CMD 창이 뜨지 않도록."""
+    return subprocess.run(
+        *args,
+        creationflags=_NO_WINDOW,
+        startupinfo=_STARTUP,
+        **kwargs,
+    )
 
 # ── 설정 ──────────────────────────────────────────────────────────────
 PORT       = 8080
@@ -47,18 +64,16 @@ def _do_push(filename):
     ts = time.strftime('%Y-%m-%d %H:%M')
     try:
         # git add
-        subprocess.run(
-            ['git', '-C', REPO_ROOT, 'add', rel_path],
-            capture_output=True, check=True, timeout=15, creationflags=_NO_WINDOW
-        )
+        _run(['git', '-C', REPO_ROOT, 'add', rel_path],
+             capture_output=True, check=True, timeout=15)
 
         # git commit
-        result = subprocess.run(
+        result = _run(
             ['git', '-C', REPO_ROOT,
              '-c', 'gpg.format=openpgp',
              '-c', 'commit.gpgsign=false',
              'commit', '-m', f'Auto-save {ts}'],
-            capture_output=True, text=True, timeout=15, creationflags=_NO_WINDOW
+            capture_output=True, text=True, timeout=15,
         )
         combined = (result.stdout + result.stderr).lower()
         if 'nothing to commit' in combined or 'nothing added' in combined:
@@ -69,13 +84,13 @@ def _do_push(filename):
             return
 
         # git push (origin main 또는 master 자동 감지)
-        branch = subprocess.run(
+        branch = _run(
             ['git', '-C', REPO_ROOT, 'rev-parse', '--abbrev-ref', 'HEAD'],
-            capture_output=True, text=True, creationflags=_NO_WINDOW
+            capture_output=True, text=True,
         ).stdout.strip() or 'main'
-        push = subprocess.run(
+        push = _run(
             ['git', '-C', REPO_ROOT, 'push', '--set-upstream', 'origin', branch],
-            capture_output=True, text=True, timeout=60, creationflags=_NO_WINDOW
+            capture_output=True, text=True, timeout=60,
         )
         if push.returncode == 0:
             print(f'  ↑  GitHub 푸시 완료  ·  {ts}')
@@ -110,6 +125,22 @@ class GanttHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        try:
+            self._handle_save()
+        except Exception as e:
+            print(f'  ✗  요청 처리 오류: {e}')
+            try:
+                resp = json.dumps({'ok': False, 'error': str(e)}).encode()
+                self.send_response(500)
+                self._cors()
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(resp)))
+                self.end_headers()
+                self.wfile.write(resp)
+            except Exception:
+                pass  # 소켓이 이미 닫혔을 때 무시
+
+    def _handle_save(self):
         if not self.path.startswith('/save'):
             self.send_error(404)
             return
@@ -118,8 +149,9 @@ class GanttHandler(SimpleHTTPRequestHandler):
         qs = parse_qs(urlparse(self.path).query)
         filename = qs.get('file', ['gantt-save.json'])[0]
 
-        # 보안: 현재 디렉토리의 .json 파일만 허용
-        if os.sep in filename or '..' in filename or not filename.endswith('.json'):
+        # 보안: 경로 구분자·상위 경로·확장자 검사
+        if ('/' in filename or '\\' in filename or
+                '..' in filename or not filename.endswith('.json')):
             self.send_error(400, 'Invalid filename')
             return
 
@@ -167,7 +199,7 @@ if __name__ == '__main__':
     os.chdir(SCRIPT_DIR)
 
     # git 설치 여부 확인
-    git_ok = subprocess.run(['git', '--version'], capture_output=True, creationflags=_NO_WINDOW).returncode == 0
+    git_ok = _run(['git', '--version'], capture_output=True).returncode == 0
     # git repo 여부 확인
     repo_ok = os.path.isdir(os.path.join(REPO_ROOT, '.git'))
 
@@ -183,7 +215,6 @@ if __name__ == '__main__':
     print('┌──────────────────────────────────────────────────┐')
     print('│  🚀  Gantt 저장 서버 실행 중                      │')
     print(f'│  브라우저:    http://localhost:{PORT}/mr-v2.html      │')
-    print(f'│  자동 저장:   변경 후 1.5초                       │')
     print(f'│  GitHub 푸시: {PUSH_DELAY}초 디바운스  {push_status}  │')
     print('│  중지:        Ctrl+C                             │')
     print('└──────────────────────────────────────────────────┘')
