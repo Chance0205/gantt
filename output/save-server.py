@@ -23,6 +23,9 @@ import sys
 import threading
 import time
 
+# Windows에서 subprocess 호출 시 cmd 창이 깜빡이지 않도록
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 # ── 설정 ──────────────────────────────────────────────────────────────
 PORT       = 8080
 AUTO_PUSH  = True   # False 로 바꾸면 파일 저장만 (git push 없음)
@@ -46,7 +49,7 @@ def _do_push(filename):
         # git add
         subprocess.run(
             ['git', '-C', REPO_ROOT, 'add', rel_path],
-            capture_output=True, check=True, timeout=15
+            capture_output=True, check=True, timeout=15, creationflags=_NO_WINDOW
         )
 
         # git commit
@@ -55,7 +58,7 @@ def _do_push(filename):
              '-c', 'gpg.format=openpgp',
              '-c', 'commit.gpgsign=false',
              'commit', '-m', f'Auto-save {ts}'],
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, timeout=15, creationflags=_NO_WINDOW
         )
         combined = (result.stdout + result.stderr).lower()
         if 'nothing to commit' in combined or 'nothing added' in combined:
@@ -68,11 +71,11 @@ def _do_push(filename):
         # git push (origin main 또는 master 자동 감지)
         branch = subprocess.run(
             ['git', '-C', REPO_ROOT, 'rev-parse', '--abbrev-ref', 'HEAD'],
-            capture_output=True, text=True
+            capture_output=True, text=True, creationflags=_NO_WINDOW
         ).stdout.strip() or 'main'
         push = subprocess.run(
             ['git', '-C', REPO_ROOT, 'push', '--set-upstream', 'origin', branch],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True, timeout=60, creationflags=_NO_WINDOW
         )
         if push.returncode == 0:
             print(f'  ↑  GitHub 푸시 완료  ·  {ts}')
@@ -164,7 +167,7 @@ if __name__ == '__main__':
     os.chdir(SCRIPT_DIR)
 
     # git 설치 여부 확인
-    git_ok = subprocess.run(['git', '--version'], capture_output=True).returncode == 0
+    git_ok = subprocess.run(['git', '--version'], capture_output=True, creationflags=_NO_WINDOW).returncode == 0
     # git repo 여부 확인
     repo_ok = os.path.isdir(os.path.join(REPO_ROOT, '.git'))
 
