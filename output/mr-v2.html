@@ -1051,6 +1051,9 @@
                 setItems(restored);
                 if (data.collapsed) setCollapsed(data.collapsed);
                 if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
+                if (data.owners) setOwners(data.owners);
+                if (data.teams) setTeams(data.teams);
+                if (data.vendors) setVendors(data.vendors);
                 setSaveStatus('saved');
               }
             }
