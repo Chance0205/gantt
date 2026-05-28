@@ -1683,7 +1683,7 @@
         <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} /> // 팀 관리 버튼과 외주사 관리 버튼 추가
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -3667,12 +3667,13 @@
                       const o = ctxOwners[k];
                       if (!o) return null;
                       return (
-                        <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--ink-2)" }}>
+                        <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ink-2)" }}>
                           <Avatar owner={o} initials={k} />
-                          <span>{o.name}</span>
-                          <span className="mono" style={{ color: "var(--ink-4)", fontSize: 10.5, marginLeft: "auto" }}>{o.role}</span>
-                        </div>);
-
+                          <span style={{ fontWeight: 500 }}>{o.name}</span>
+                          {/* 💡 marginLeft: "auto"를 제거하고 앞에 연한 대시( - )를 추가해 붙였습니다 */}
+                          <span className="mono" style={{ color: "var(--ink-4)", fontSize: 10.5 }}>- {o.role}</span>
+                        </div>
+                      );
                     })}
                   </div>
                 </div>
