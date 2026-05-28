@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구글 시트 연동 간트 차트</title>
+
+    <script src="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.js"></script>
+    <link href="https://cdn.dhtmlx.com/gantt/edge/dhtmlxgantt.css" rel="stylesheet">
+    <link href="index.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-left">
+                <h1>프로젝트 일정 관리</h1>
+                <button class="add-btn" onclick="addNewTask()">+ 새 작업 추가</button>
+                <button class="sync-btn" onclick="loadGanttData()">🔄 엑셀 데이터 불러오기</button>
+                <button class="ai-btn" onclick="generateAITasks()">✨ AI 작업 분할</button>
+                <button class="ai-btn analyze" onclick="analyzeProject()">✨ AI 일정 진단</button>
+                <div id="syncStatus" class="status-badge">🟡 대기 중...</div>
+            </div>
+            <div class="url-settings">
+                <input type="text" id="apiUrlInput" placeholder="Apps Script 배포 URL 입력">
+                <button onclick="saveApiUrl()">URL 저장</button>
+            </div>
+        </header>
+        <div id="gantt_here" class="gantt-wrapper"></div>
+    </div>
+
+    <div class="ai-modal-overlay" id="aiModalOverlay">
+        <div class="ai-modal">
+            <h2>✨ AI 프로젝트 일정 진단 리포트</h2>
+            <p id="aiModalContent">진단 결과를 불러오는 중입니다...</p>
+            <div class="ai-modal-close">
+                <button onclick="document.getElementById('aiModalOverlay').style.display='none'">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+
+</html>
