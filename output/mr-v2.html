@@ -1636,8 +1636,15 @@
         return map;
       }, [enriched]);
 
+      const allOwners = useMemo(() => ({ ...owners, ...vendors }), [owners, vendors]);
+      const allTeams = useMemo(() => {
+        const vKeys = Object.keys(vendors);
+        if (vKeys.length === 0) return teams;
+        return [...teams, { id: "VENDOR_TEAM", name: "Vendor", members: vKeys }];
+      }, [teams, vendors]);
+
       return (
-        <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
+        <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
             <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
@@ -2310,9 +2317,9 @@
                           width: 16, height: 16,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           borderRadius: 2, border: "1px solid var(--line-2)",
-                          color: "var(--accent)", fontSize: 13, cursor: "pointer",
-                          fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
-                          background: "var(--paper-2)",
+                          color: "var(--accent)", fontSize: 12, cursor: "pointer",
+                          fontFamily: "IBM Plex Mono, monospace", lineHeight: "16px",
+                          background: "var(--paper-2)", userSelect: "none",
                         }}>+</span>
                       <span
                         onClick={(e) => {
@@ -2324,8 +2331,8 @@
                           width: 16, height: 16,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           borderRadius: 2, border: "1px solid var(--line-2)",
-                          color: "var(--ink-3)", fontSize: 11, cursor: "pointer",
-                          lineHeight: 1, background: "var(--paper-2)",
+                          color: "var(--ink-3)", fontSize: 10, cursor: "pointer",
+                          lineHeight: "16px", background: "var(--paper-2)", userSelect: "none",
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.color = "#c44b3d"; e.currentTarget.style.borderColor = "#c44b3d"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ink-3)"; e.currentTarget.style.borderColor = "var(--line-2)"; }}
@@ -2407,7 +2414,7 @@
                       return (
                         <div key={idx} style={{
                           position: "absolute", left: w.i * dayW, width: wpx, height: "100%",
-                          borderRight: "1px dashed var(--line-2)",
+                          borderRight: "1px solid var(--line-2)",
                           display: "flex", alignItems: "center", paddingLeft: 3, overflow: "hidden"
                         }}>
                           {wpx >= 18 && <span className="mono" style={{ fontSize: 8, color: "var(--ink-4)", letterSpacing: 0.2, whiteSpace: "nowrap" }}>W{w.w}</span>}
@@ -2450,22 +2457,14 @@
 
                 {/* grid lines + 주말 배경 — zoom에 맞춰 */}
                 {zoomLevel === "month12" ? (
-                  /* month12: 주 경계 점선(연하게) + 월 경계 실선 */
-                  <>
-                    {weeks.map((w, idx) =>
-                      <div key={`w${idx}`} style={{
-                        position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
-                        backgroundImage: "repeating-linear-gradient(to bottom, var(--line-2) 0, var(--line-2) 3px, transparent 3px, transparent 6px)",
-                        pointerEvents: "none", opacity: 0.7
-                      }} />
-                    )}
-                    {months.map((m, idx) =>
-                      <div key={idx} style={{
-                        position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
-                        background: "var(--line)", pointerEvents: "none"
-                      }} />
-                    )}
-                  </>
+                  /* month12: 주 경계 점선만 */
+                  weeks.map((w, idx) =>
+                    <div key={`w${idx}`} style={{
+                      position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
+                      backgroundImage: "repeating-linear-gradient(to bottom, var(--line-2) 0, var(--line-2) 3px, transparent 3px, transparent 6px)",
+                      pointerEvents: "none"
+                    }} />
+                  )
                 ) : (
                   /* month1: 주말 배경 + 주 경계(점선) + 월 경계(실선) */
                   <>
@@ -3123,7 +3122,7 @@
         if (allMembers.length > 0 && values.length === allMembers.length && allMembers.every((m) => values.includes(m))) return "ALL";
         for (const t of ctxTeams) {
           const valid = t.members.filter((m) => ctxOwners[m]);
-          if (valid.length > 0 && valid.length === values.length && valid.every((m) => values.includes(m))) return t.name;
+          if (valid.length > 1 && valid.length === values.length && valid.every((m) => values.includes(m))) return t.name;
         }
         return null;
       })();
