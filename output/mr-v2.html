@@ -710,7 +710,7 @@ const totalDays = dayDiff(PROJECT_START, PROJECT_END);
 const addDays = (dt, n) => new Date(dt.getTime() + n * DAY);
 const sameDay = (a, b) => a.getTime() === b.getTime();
 const monthName = (m) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m];
-const fmtDate = (dt) => `${monthName(dt.getMonth())} ${dt.getDate()}`;
+const fmtDate = (dt) => { if (!dt) return "—"; return `${monthName(dt.getMonth())} ${dt.getDate()}`; };
 const fmtLong = (dt) => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()]}, ${monthName(dt.getMonth())} ${dt.getDate()}`;
 
 function isoWeek(dt) {
@@ -760,10 +760,12 @@ function aggregateSummary(items, idx) {
     if (!hasChildrenAfter(items, i)) leaves.push(items[i]);
   }
   if (!leaves.length) return null;
-  const minStart = leaves.reduce((m, l) => l.start < m ? l.start : m, leaves[0].start);
-  const maxEnd = leaves.reduce((m, l) => l.end > m ? l.end : m, leaves[0].end);
-  const totalD = leaves.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)), 0);
-  const weighted = leaves.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)) * l.pct, 0);
+  const dated = leaves.filter(l => l.start && l.end);
+  if (!dated.length) return null;
+  const minStart = dated.reduce((m, l) => l.start < m ? l.start : m, dated[0].start);
+  const maxEnd = dated.reduce((m, l) => l.end > m ? l.end : m, dated[0].end);
+  const totalD = dated.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)), 0);
+  const weighted = dated.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)) * l.pct, 0);
   return { start: minStart, end: maxEnd, pct: Math.round(weighted / totalD), leafCount: leaves.length };
 }
 
@@ -936,7 +938,13 @@ function App() {
   // ── owners / teams (편집 가능한 팀원 목록) ─────────────────────────────
   const [owners, setOwners] = useState(() => {
     const saved = loadFromStorage();
-    return (saved && saved.owners) ? saved.owners : { ...PROJECT_CONFIG.owners };
+    if (!saved || !saved.owners) return { ...PROJECT_CONFIG.owners };
+    // 저장된 owner에 tint 누락 시 PROJECT_CONFIG 값으로 보완 (버전 업 대응)
+    return Object.fromEntries(
+      Object.entries(saved.owners).map(([id, o]) => [
+        id, { tint: PROJECT_CONFIG.owners[id]?.tint, ...o }
+      ])
+    );
   });
   const [teams, setTeams] = useState(() => {
     const saved = loadFromStorage();
@@ -1167,6 +1175,7 @@ function App() {
   const [focusId, setFocusId] = useState(null);
   const [selectedDep, setSelectedDep] = useState(null); // {fromId, toId} or null
   const [depMenu, setDepMenu] = useState(null); // {x, y, fromId, toId}
+  const [pendingDelete, setPendingDelete] = useState(null); // {id, name, childCount}
 
   const [ctxMenu, setCtxMenu] = useState(null); // { id, x, y } | null
 
@@ -1306,7 +1315,8 @@ function App() {
         setSelectedDep(null);
       } else if (e.key === "Delete" && focusId) {
         e.preventDefault();
-        deleteItem(focusId);
+        const row = enriched.find(r => r.id === focusId);
+        if (row) setPendingDelete({ id: focusId, name: row.name, childCount: row.isSummary ? (row.leafCount || 0) : 0 });
       } else if (e.key === "Escape") {
         setSelectedDep(null);
         setDepMenu(null);
@@ -1315,7 +1325,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedDep, focusId, removeDep, deleteItem]);
+  }, [selectedDep, focusId, removeDep, deleteItem, enriched]);
 
   // Click outside dep arrow / context menu to clear
   useEffect(() => {
@@ -1620,6 +1630,37 @@ function App() {
       </div>
       <Footer enriched={enriched} />
       {showTeamModal && <TeamModal owners={owners} teams={teams} onSave={updateTeamData} onClose={() => setShowTeamModal(false)} />}
+      {pendingDelete && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setPendingDelete(null)}>
+          <div style={{ background: "var(--paper)", border: "1px solid var(--line)", borderRadius: 6,
+            boxShadow: "0 16px 40px -10px rgba(0,0,0,0.4)", padding: "28px 32px", minWidth: 320, maxWidth: 420 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="serif" style={{ fontSize: 17, color: "var(--ink)", marginBottom: 8 }}>태스크 삭제</div>
+            <div className="mono" style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 6, wordBreak: "break-word" }}>
+              <strong>"{pendingDelete.name}"</strong>
+            </div>
+            {pendingDelete.childCount > 0 && (
+              <div className="mono" style={{ fontSize: 11, color: "var(--accent)", marginBottom: 12 }}>
+                하위 {pendingDelete.childCount}개 태스크도 함께 삭제됩니다.
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 20 }}>이 작업은 되돌릴 수 없습니다.</div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setPendingDelete(null)} style={{
+                padding: "6px 16px", borderRadius: 3, border: "1px solid var(--line-2)",
+                background: "var(--paper-2)", color: "var(--ink-2)", fontSize: 12,
+                fontFamily: "IBM Plex Mono, monospace", cursor: "pointer"
+              }}>취소</button>
+              <button onClick={() => { deleteItem(pendingDelete.id); setPendingDelete(null); }} style={{
+                padding: "6px 16px", borderRadius: 3, border: "1px solid #c44b3d",
+                background: "#c44b3d", color: "#fff", fontSize: 12,
+                fontFamily: "IBM Plex Mono, monospace", cursor: "pointer"
+              }}>삭제</button>
+            </div>
+          </div>
+        </div>
+      )}
       {ctxMenu && (
         <React.Fragment>
           <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
@@ -2147,7 +2188,7 @@ function GanttGrid(props) {
                     }} />
                   {lvl === 3 &&
                   <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1 }}>
-                      {fmtDate(r.start)} → {fmtDate(r.end)} · {dayDiff(r.start, r.end)}d
+                      {fmtDate(r.start)} → {fmtDate(r.end)}{r.start && r.end ? ` · ${dayDiff(r.start, r.end)}d` : ""}
                     </div>
                   }
                 </div>
@@ -2179,10 +2220,7 @@ function GanttGrid(props) {
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (r.isSummary && r.leafCount > 0) {
-                        if (!confirm(`"${r.name}" 및 하위 ${r.leafCount}개 태스크를 모두 삭제할까요?`)) return;
-                      }
-                      deleteItem(r.id);
+                      setPendingDelete({ id: r.id, name: r.name, childCount: r.isSummary ? (r.leafCount || 0) : 0 });
                     }}
                     title="태스크 삭제 (Delete 키)"
                     style={{
@@ -2262,17 +2300,20 @@ function GanttGrid(props) {
 
               })}
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 24, height: 32 }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 24, bottom: 0 }}>
               {zoomLevel === "month12" ?
-              /* 12-month zoom: month 경계만 표시 */
-              months.map((m, idx) => {
-                const next = months[idx + 1];
-                const w = ((next ? next.i : viewTotalDays) - m.i) * dayW;
+              /* 12-month zoom: 주 경계 + 주 번호 */
+              weeks.map((w, idx) => {
+                const next = weeks[idx + 1];
+                const wpx = ((next ? next.i : viewTotalDays) - w.i) * dayW;
                 return (
                   <div key={idx} style={{
-                    position: "absolute", left: m.i * dayW, width: w, height: 32,
-                    borderRight: "1px dashed var(--line-2)"
-                  }} />);
+                    position: "absolute", left: w.i * dayW, width: wpx, height: "100%",
+                    borderRight: "1px dashed var(--line-2)",
+                    display: "flex", alignItems: "center", paddingLeft: 3, overflow: "hidden"
+                  }}>
+                    {wpx >= 18 && <span className="mono" style={{ fontSize: 8, color: "var(--ink-4)", letterSpacing: 0.2, whiteSpace: "nowrap" }}>W{w.w}</span>}
+                  </div>);
               }) :
               /* month1: 일 단위 셀, 주말 붉은 배경 */
               days.map((dt, i) => {
@@ -2281,7 +2322,7 @@ function GanttGrid(props) {
                 const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                 return (
                   <div key={i} style={{
-                    position: "absolute", left: i * dayW, width: dayW, height: 32,
+                    position: "absolute", left: i * dayW, width: dayW, height: "100%",
                     borderRight: isFirstOfMonth ? "1px solid var(--line)" : "1px dashed var(--line-2)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                     background: isToday ? "rgba(138,58,31,0.12)" : isWeekend ? "rgba(200,40,40,0.07)" : "transparent"
@@ -2510,6 +2551,7 @@ function GanttGrid(props) {
             {rows.map((r, i) => {
               const color = colorFor(r.code);
               if (r.isSummary) {
+                if (!r.start || !r.end) return null;
                 const x = dayDiff(viewStart, r.start) * dayW;
                 const w = Math.max(dayW * 0.7, dayDiff(r.start, r.end) * dayW);
                 return (
@@ -2596,31 +2638,21 @@ function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeav
       cursor: "pointer", zIndex: isHover || isFocus ? 4 : 2
     }}>
       <div style={{
-        position: "absolute", top: barH / 2 - 1, left: 0, width: w, height: 2,
+        position: "absolute", top: barH / 2 - 1, left: 0, width: w, height: 3,
         background: color, opacity: 0.45
       }} />
       <div style={{
-        position: "absolute", top: barH / 2 - 1, left: 0, width: fillW, height: 2,
+        position: "absolute", top: barH / 2 - 1, left: 0, width: fillW, height: 3,
         background: color
       }} />
-      {/* sturdier end caps — bracket-style */}
+      {/* dot end caps */}
       <div style={{
-        position: "absolute", top: 0, left: 0, width: 3, height: barH, background: color, borderRadius: 1
+        position: "absolute", top: barH / 2 - 4, left: -3,
+        width: 8, height: 8, borderRadius: 99, background: color
       }} />
       <div style={{
-        position: "absolute", top: 0, right: 0, width: 3, height: barH, background: color, borderRadius: 1
-      }} />
-      <div style={{
-        position: "absolute", bottom: -5, left: -3, width: 0, height: 0,
-        borderLeft: "5px solid transparent",
-        borderRight: "5px solid transparent",
-        borderTop: `6px solid ${color}`
-      }} />
-      <div style={{
-        position: "absolute", bottom: -5, right: -3, width: 0, height: 0,
-        borderLeft: "5px solid transparent",
-        borderRight: "5px solid transparent",
-        borderTop: `6px solid ${color}`
+        position: "absolute", top: barH / 2 - 4, right: -3,
+        width: 8, height: 8, borderRadius: 99, background: color
       }} />
 
     </div>);
@@ -2756,7 +2788,8 @@ function Avatar({ owner, initials }) {
 
 }
 
-function PctChip({ pct, editable, onChange }) {
+function PctChip({ pct: rawPct, editable, onChange }) {
+  const pct = (rawPct == null || isNaN(rawPct)) ? 0 : Math.max(0, Math.min(100, rawPct));
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(String(pct));
   useEffect(() => {setVal(String(pct));}, [pct]);
