@@ -936,7 +936,13 @@ function App() {
   // ── owners / teams (편집 가능한 팀원 목록) ─────────────────────────────
   const [owners, setOwners] = useState(() => {
     const saved = loadFromStorage();
-    return (saved && saved.owners) ? saved.owners : { ...PROJECT_CONFIG.owners };
+    if (!saved || !saved.owners) return { ...PROJECT_CONFIG.owners };
+    // 저장된 owner에 tint 누락 시 PROJECT_CONFIG 값으로 보완 (버전 업 대응)
+    return Object.fromEntries(
+      Object.entries(saved.owners).map(([id, o]) => [
+        id, { tint: PROJECT_CONFIG.owners[id]?.tint, ...o }
+      ])
+    );
   });
   const [teams, setTeams] = useState(() => {
     const saved = loadFromStorage();
