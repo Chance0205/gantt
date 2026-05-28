@@ -1446,6 +1446,7 @@
       // ------- dep drag -------
       const [depDrag, setDepDrag] = useState(null); // {fromId, fromX, fromY, x, y, hitId}
       const scrollWrapRef = useRef(null);
+      const headerScrollRef = useRef(null);
 
       const startDepDrag = useCallback((e, row) => {
         e.stopPropagation();
@@ -1461,7 +1462,7 @@
           const rect = wrap.getBoundingClientRect();
           return {
             x: ev.clientX - rect.left + wrap.scrollLeft,
-            y: ev.clientY - rect.top - 56 // 56 = headerH
+            y: ev.clientY - rect.top
           };
         }
         function onMove(ev) {
@@ -2375,11 +2376,12 @@
             </div>
           </div>
 
-          {/* RIGHT — scrollable */}
-          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "clip", position: "relative" }}>
+          {/* RIGHT — header + scrollable body */}
+          <div style={{ display: "flex", flexDirection: "column", overflow: "clip" }}>
+          {/* HEADER — sticky, 가로 스크롤은 JS로 동기화 */}
+          <div ref={headerScrollRef} style={{ overflowX: "hidden", overflowY: "clip", flexShrink: 0, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
             <div style={{ width: timelineW, position: "relative" }}>
-              {/* HEADER */}
-              <div style={{ height: headerH, borderBottom: "1px solid var(--line)", position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
+              <div style={{ height: headerH, borderBottom: "1px solid var(--line)" }}>
                 <div style={{ position: "absolute", inset: 0, height: 24, borderBottom: "1px solid var(--line)" }}>
                   {months.map((m, idx) => {
                     const next = months[idx + 1];
@@ -2435,7 +2437,12 @@
                   }
                 </div>
               </div>
-
+            </div>
+          </div>
+          {/* BODY — 가로 스크롤 컨테이너 */}
+          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "clip", position: "relative" }}
+            onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
+            <div style={{ width: timelineW, position: "relative" }}>
               {/* BODY (pan capture surface) */}
               <div
                 onMouseDown={startPan}
@@ -2721,6 +2728,7 @@
                 })}
               </div>
             </div>
+          </div>
           </div>
           {detailId && (() => {
             const detailItem = rows.find((r) => r.id === detailId);
