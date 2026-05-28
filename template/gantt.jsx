@@ -200,10 +200,12 @@ function aggregateSummary(items, idx) {
     if (!hasChildrenAfter(items, i)) leaves.push(items[i]);
   }
   if (!leaves.length) return null;
-  const minStart = leaves.reduce((m, l) => l.start < m ? l.start : m, leaves[0].start);
-  const maxEnd = leaves.reduce((m, l) => l.end > m ? l.end : m, leaves[0].end);
-  const totalD = leaves.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)), 0);
-  const weighted = leaves.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)) * l.pct, 0);
+  const dated = leaves.filter(l => l.start && l.end);
+  if (!dated.length) return null;
+  const minStart = dated.reduce((m, l) => l.start < m ? l.start : m, dated[0].start);
+  const maxEnd = dated.reduce((m, l) => l.end > m ? l.end : m, dated[0].end);
+  const totalD = dated.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)), 0);
+  const weighted = dated.reduce((s, l) => s + Math.max(1, dayDiff(l.start, l.end)) * l.pct, 0);
   return { start: minStart, end: maxEnd, pct: Math.round(weighted / totalD), leafCount: leaves.length };
 }
 
@@ -1979,6 +1981,7 @@ function GanttGrid(props) {
             {rows.map((r, i) => {
               const color = colorFor(r.code);
               if (r.isSummary) {
+                if (!r.start || !r.end) return null;
                 const x = dayDiff(viewStart, r.start) * dayW;
                 const w = Math.max(dayW * 0.7, dayDiff(r.start, r.end) * dayW);
                 return (
