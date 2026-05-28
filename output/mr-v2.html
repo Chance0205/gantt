@@ -1034,7 +1034,8 @@
       const [lastSavedAt, setLastSavedAt] = useState(null);
       const [isDirty, setIsDirty] = useState(false);
       const [serverOnline, setServerOnline] = useState(false);
-      const isHTTP = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+      const isHTTP = (window.location.protocol === 'http:' || window.location.protocol === 'https:') &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
       // 서버 생존 확인 (5초마다)
       useEffect(() => {
