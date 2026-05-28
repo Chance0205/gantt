@@ -1883,15 +1883,13 @@
           <span style={{
             display: "flex", alignItems: "center", gap: 5,
             fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.06em",
-            color: "var(--ink-3)"
-          }}>
+            color: "var(--ink-3)",
+            cursor: lastSavedAt ? "default" : undefined,
+          }}
+            title={lastSavedAt ? lastSavedAt.toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : undefined}
+          >
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
             {label}
-            {lastSavedAt && (
-              <span style={{ color: "var(--ink-4)", fontSize: 9.5 }}>
-                · {lastSavedAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            )}
           </span>
           {isHTTP && !offline && (
             <button onClick={onSave} disabled={!isDirty || status === 'saving'} style={{
