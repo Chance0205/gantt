@@ -65,9 +65,13 @@ def _do_push(filename):
             print(f'  ✗  커밋 실패: {result.stderr.strip()}')
             return
 
-        # git push
+        # git push (origin main 또는 master 자동 감지)
+        branch = subprocess.run(
+            ['git', '-C', REPO_ROOT, 'rev-parse', '--abbrev-ref', 'HEAD'],
+            capture_output=True, text=True
+        ).stdout.strip() or 'main'
         push = subprocess.run(
-            ['git', '-C', REPO_ROOT, 'push'],
+            ['git', '-C', REPO_ROOT, 'push', '--set-upstream', 'origin', branch],
             capture_output=True, text=True, timeout=60
         )
         if push.returncode == 0:
