@@ -1666,7 +1666,7 @@ function GanttGrid(props) {
                       lineHeight: 1.15,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       fontFamily: lvl === 1 ? "Instrument Serif, Georgia, serif" : "inherit",
-                      letterSpacing: lvl === 1 ? "-0.005em" : 0
+                      letterSpacing: lvl === 1 ? "0.02em" : 0
                     }} />
                   {lvl === 3 &&
                   <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1 }}>
@@ -2123,20 +2123,20 @@ function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeav
       cursor: "pointer", zIndex: isHover || isFocus ? 4 : 2
     }}>
       <div style={{
-        position: "absolute", top: barH / 2 - 1, left: 0, width: w, height: 3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: w, height: 3,
         background: color, opacity: 0.45
       }} />
       <div style={{
-        position: "absolute", top: barH / 2 - 1, left: 0, width: fillW, height: 3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: fillW, height: 3,
         background: color
       }} />
       {/* dot end caps */}
       <div style={{
-        position: "absolute", top: barH / 2 - 4, left: -3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", left: -4,
         width: 8, height: 8, borderRadius: 99, background: color
       }} />
       <div style={{
-        position: "absolute", top: barH / 2 - 4, right: -3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", right: -4,
         width: 8, height: 8, borderRadius: 99, background: color
       }} />
 
