@@ -2672,11 +2672,11 @@ function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeav
       cursor: "pointer", zIndex: isHover || isFocus ? 4 : 2
     }}>
       <div style={{
-        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: w, height: 3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 4, width: Math.max(0, w - 8), height: 3,
         background: color, opacity: 0.45
       }} />
       <div style={{
-        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 0, width: fillW, height: 3,
+        position: "absolute", top: "50%", transform: "translateY(-50%)", left: 4, width: Math.max(0, fillW - 8), height: 3,
         background: color
       }} />
       {/* dot end caps */}
