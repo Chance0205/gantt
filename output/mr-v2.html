@@ -3275,10 +3275,16 @@
             }}>
 
             {/* Header */}
-            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <span className="mono" style={{ fontSize: 12, color: rootColor, fontWeight: 700, letterSpacing: 0.4, paddingTop: 4, flexShrink: 0 }}>{item.code}</span>
-              <span className="serif" style={{ fontSize: 20, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.25 }}>{item.name}</span>
-              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 16, padding: 4, flexShrink: 0, lineHeight: 1 }}>✕</button>
+            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span className="mono" style={{ fontSize: 11, color: rootColor, fontWeight: 700, letterSpacing: 0.5,
+                  background: rootColor + "18", padding: "2px 7px", borderRadius: 3, flexShrink: 0 }}>{item.code}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ width: 3, borderRadius: 2, background: rootColor, alignSelf: "stretch", flexShrink: 0, marginTop: 2 }} />
+                <span className="serif" style={{ fontSize: 20, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.25 }}>{item.name}</span>
+                <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 16, padding: 4, flexShrink: 0, lineHeight: 1 }}>✕</button>
+              </div>
             </div>
 
             {/* Info grid */}
