@@ -1038,27 +1038,34 @@
       // On mount: try to load server save file (may be newer than localStorage, e.g. different browser)
       useEffect(() => {
         if (!isHTTP) return; // file:// 프로토콜에서는 skip
-        fetch('/' + SAVE_FILENAME)
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => {
-            if (!data || !data.items) return;
-            const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
-            const localRaw = localStorage.getItem(STORAGE_KEY);
-            const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
-            if (serverTime >= localTime) {
-              const restored = deserializeItems(data.items);
-              if (restored) {
-                setItems(restored);
-                if (data.collapsed) setCollapsed(data.collapsed);
-                if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
-                if (data.owners) setOwners(data.owners);
-                if (data.teams) setTeams(data.teams);
-                if (data.vendors) setVendors(data.vendors);
-                setSaveStatus('saved');
+        // Check if a real save server exists (Claude Code web env).
+        // Local python http.server has no /ping, so hasServer=false.
+        // When no save server, always prefer JSON (git pull is the source of truth).
+        const hasSaveServer = fetch('/ping').then((r) => r.ok).catch(() => false);
+        hasSaveServer.then((hasServer) => {
+          fetch('/' + SAVE_FILENAME)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+              if (!data || !data.items) return;
+              const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
+              const localRaw = localStorage.getItem(STORAGE_KEY);
+              const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
+              // No save server = local mode: JSON from git is ground truth, ignore localStorage timestamp
+              if (!hasServer || serverTime >= localTime) {
+                const restored = deserializeItems(data.items);
+                if (restored) {
+                  setItems(restored);
+                  if (data.collapsed) setCollapsed(data.collapsed);
+                  if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
+                  if (data.owners) setOwners(data.owners);
+                  if (data.teams) setTeams(data.teams);
+                  if (data.vendors) setVendors(data.vendors);
+                  setSaveStatus('saved');
+                }
               }
-            }
-          })
-          .catch(() => { /* server not running — 그냥 localStorage 사용 */ });
+            })
+            .catch(() => { /* JSON 파일 없음 — localStorage 사용 */ });
+        });
       }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
       // 변경 감지 → dirty 표시
