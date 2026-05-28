@@ -919,10 +919,10 @@ function App() {
 
   const [v, setTweak] = window.useTweaks ? window.useTweaks({
     accent: "#8a3a1f",
-    zoom: "month1",
+    zoom: "month12",
     showDeps: true,
     owner: "all"
-  }) : [{ accent: "#8a3a1f", zoom: "month1", showDeps: true, owner: "all" }, () => {}];
+  }) : [{ accent: "#8a3a1f", zoom: "month12", showDeps: true, owner: "all" }, () => {}];
 
   useEffect(() => {
     document.documentElement.style.setProperty("--accent", v.accent);
