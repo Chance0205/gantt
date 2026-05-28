@@ -1260,16 +1260,16 @@ function Stat({ label, value, accent }) {
 }
 
 function SaveIndicator({ status, onSave, isHTTP }) {
-  const canSave = isHTTP && status === 'dirty';
+  const isDirty = status === 'dirty';
   const dot =
     status === 'saved'  ? "#22c55e" :
-    status === 'dirty'  ? "#f59e0b" :
+    isDirty             ? "#f59e0b" :
     status === 'saving' ? "#f59e0b" :
     status === 'error'  ? "#ef4444" :
     isHTTP              ? "#22c55e" : "var(--ink-4)";
   const label =
     status === 'saved'  ? "Saved" :
-    status === 'dirty'  ? "Unsaved" :
+    isDirty             ? "Unsaved" :
     status === 'saving' ? "Saving…" :
     status === 'error'  ? "Error" :
     isHTTP              ? "Synced" : "No server";
@@ -1281,12 +1281,15 @@ function SaveIndicator({ status, onSave, isHTTP }) {
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
         {label}
       </span>
-      {canSave && (
-        <button onClick={onSave} style={{
+      {isHTTP && (
+        <button onClick={onSave} disabled={!isDirty || status === 'saving'} style={{
           padding: "2px 10px", borderRadius: 3,
-          border: "1px solid var(--accent)", background: "var(--accent)",
-          color: "#fff", fontSize: 10.5, fontFamily: "IBM Plex Mono, monospace",
-          cursor: "pointer", letterSpacing: "0.04em"
+          border: `1px solid ${isDirty ? "var(--accent)" : "var(--line-2)"}`,
+          background: isDirty ? "var(--accent)" : "var(--paper-2)",
+          color: isDirty ? "#fff" : "var(--ink-4)",
+          fontSize: 10.5, fontFamily: "IBM Plex Mono, monospace",
+          cursor: isDirty ? "pointer" : "default",
+          letterSpacing: "0.04em", transition: "all 200ms"
         }}>Save</button>
       )}
     </span>
