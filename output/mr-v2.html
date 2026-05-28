@@ -3583,12 +3583,12 @@
       return (
         <footer style={{ marginTop: 32, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
           <div>
-            <div className="mono small-caps" style={{ color: "var(--ink-3)", marginBottom: 8 }}>Modules</div>
+            <div className="mono small-caps" style={{ color: "var(--ink-3)", marginBottom: 8 }}>Work Packages</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, color: "var(--ink-2)" }}>
-              {Object.entries(ROOTS).map(([k, r]) =>
-                <div key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 16, height: 8, background: r.color, borderRadius: 1 }} />
-                  <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>{k}</span>
+              {(enriched || []).filter((r) => r.level === 1).map((r) =>
+                <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 16, height: 8, background: rootInfo(r.code).color, borderRadius: 1, flexShrink: 0 }} />
+                  <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)" }}>{r.code}</span>
                   <span>{r.name}</span>
                 </div>
               )}
