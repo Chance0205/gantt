@@ -590,7 +590,7 @@
     // Gantt — WBS-driven, fully editable.
     // 데이터는 window.__GANTT_DATA__ (외부 data.js)에서 우선 로드,
     // 없으면 아래 내장 기본값 사용.
-    const { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } = React;
+    const { useState, useMemo, useRef, useEffect, useCallback } = React;
 
     // ================================================================
     // ▼▼▼  내장 기본 데이터 — 외부 data.js 없을 때만 사용됨  ▼▼▼
@@ -679,7 +679,6 @@
     const PROJECT_START = PROJECT_CONFIG.projectStart;
     const PROJECT_END = PROJECT_CONFIG.projectEnd;
     const TODAY = PROJECT_CONFIG.today || new Date();
-    const d = _d;   // 하위 호환 유지
     const TEAMS = PROJECT_CONFIG.teams;
     const OWNERS = PROJECT_CONFIG.owners;
     // ── owners/teams context (편집 가능하도록 Context로 관리) ──────────────────
@@ -692,9 +691,7 @@
     // ---------- helpers ----------
     const DAY = 86400000;
     const dayDiff = (a, b) => Math.round((b - a) / DAY);
-    const totalDays = dayDiff(PROJECT_START, PROJECT_END);
     const addDays = (dt, n) => new Date(dt.getTime() + n * DAY);
-    const sameDay = (a, b) => a.getTime() === b.getTime();
     const monthName = (m) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m];
     const fmtDate = (dt) => { if (!dt) return "—"; return `${monthName(dt.getMonth())} ${dt.getDate()}`; };
     const fmtLong = (dt) => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()]}, ${monthName(dt.getMonth())} ${dt.getDate()}`;
@@ -730,14 +727,6 @@
     }
 
     // Determine parent id of item at index in items (looks backwards for first item with smaller level).
-    function parentOf(items, idx) {
-      const lvl = items[idx].level;
-      for (let i = idx - 1; i >= 0; i--) {
-        if (items[i].level < lvl) return items[i].id;
-      }
-      return null;
-    }
-
     // Aggregate min/max/avg pct for a summary's leaves.
     function aggregateSummary(items, idx) {
       const [start, end] = subtreeRange(items, idx);
@@ -848,7 +837,6 @@
       }
     }
 
-    // vendors 추가
     function saveToStorage(items, collapsed, meta, owners, teams, vendors) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -857,7 +845,7 @@
           meta,
           owners,
           teams,
-          vendors, // 추가
+          vendors,
           _savedAt: new Date().toISOString(),
         }));
       } catch (e) {
@@ -869,15 +857,14 @@
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) { }
     }
 
-    // Download items as a JSON file. (owners, teams, vendors 추가)
     function downloadJSON(items, collapsed, meta, owners, teams, vendors) {
       const data = {
         items: serializeItems(items),
         collapsed,
         meta,
-        owners, // 추가
-        teams,  // 추가
-        vendors, // 추가
+        owners,
+        teams,
+        vendors,
         exportedAt: new Date().toISOString(),
         version: 1,
       };
@@ -943,7 +930,6 @@
       });
       const [showTeamModal, setShowTeamModal] = useState(false);
 
-      // 👇============== 외주사(Vendor) 전용 State 추가 ==============👇
       const [vendors, setVendors] = useState(() => {
         const saved = loadFromStorage();
         return (saved && saved.vendors) ? saved.vendors : {
@@ -961,7 +947,6 @@
           })));
         }
       }, []);
-      // 👆===========================================================👆
 
       // 전역 OWNERS/TEAMS 동기화 (직접 참조하는 코드용)
       useEffect(() => {
@@ -1137,10 +1122,9 @@
             setCollapsed(parsed.collapsed || {});
             if (parsed.meta) setMetaState(parsed.meta);
 
-            // 👇 여기에 팀원 목록(owners)과 팀(teams) 정보도 가져오도록 코드 추가 👇
             if (parsed.owners) setOwners(parsed.owners);
             if (parsed.teams) setTeams(parsed.teams);
-            if (parsed.vendors) setVendors(parsed.vendors); // 외주사 정보도 가져오기
+            if (parsed.vendors) setVendors(parsed.vendors);
           } catch (err) {
             alert("Could not parse JSON file: " + err.message);
           }
@@ -1205,7 +1189,6 @@
         // 2) collapse pass — drop descendants of collapsed summaries
         const out = [];
         let collapseAtLevel = null; // if set, drop items whose level > this
-        let collapseBoundary = null;
         enriched.forEach((r) => {
           if (collapseAtLevel != null && r.level > collapseAtLevel) return; // hidden inside collapsed subtree
           if (collapseAtLevel != null && r.level <= collapseAtLevel) {
@@ -1689,7 +1672,6 @@
             </div>
             <Footer enriched={enriched} />
             {showTeamModal && <TeamModal owners={owners} teams={teams} onSave={updateTeamData} onClose={() => setShowTeamModal(false)} />}
-            {/* 👇 외주사 모달 노출 처리 추가 */}
             {showVendorModal && <VendorModal vendors={vendors} onSave={updateVendorData} onClose={() => setShowVendorModal(false)} />}
             {pendingDelete && (
               <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(28,25,22,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}

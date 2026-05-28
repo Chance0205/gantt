@@ -625,7 +625,7 @@ Object.assign(window, {
 
   <script type="text/babel">
 // Gantt — WBS-driven, fully editable. Project data lives in PROJECT_CONFIG below.
-const { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } = React;
+const { useState, useMemo, useRef, useEffect, useCallback } = React;
 
 // ================================================================
 // ▼▼▼  PROJECT CONFIGURATION — 새 프로젝트는 여기만 수정  ▼▼▼
@@ -726,9 +726,7 @@ const STORAGE_KEY   = PROJECT_CONFIG.storageKey;
 // ---------- helpers ----------
 const DAY = 86400000;
 const dayDiff = (a, b) => Math.round((b - a) / DAY);
-const totalDays = dayDiff(PROJECT_START, PROJECT_END);
 const addDays = (dt, n) => new Date(dt.getTime() + n * DAY);
-const sameDay = (a, b) => a.getTime() === b.getTime();
 const monthName = (m) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m];
 const fmtDate = (dt) => `${monthName(dt.getMonth())} ${dt.getDate()}`;
 const fmtLong = (dt) => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()]}, ${monthName(dt.getMonth())} ${dt.getDate()}`;
@@ -764,14 +762,6 @@ function subtreeRange(items, idx) {
 }
 
 // Determine parent id of item at index in items (looks backwards for first item with smaller level).
-function parentOf(items, idx) {
-  const lvl = items[idx].level;
-  for (let i = idx - 1; i >= 0; i--) {
-    if (items[i].level < lvl) return items[i].id;
-  }
-  return null;
-}
-
 // Aggregate min/max/avg pct for a summary's leaves.
 function aggregateSummary(items, idx) {
   const [start, end] = subtreeRange(items, idx);
@@ -996,7 +986,6 @@ function App() {
     // 2) collapse pass — drop descendants of collapsed summaries
     const out = [];
     let collapseAtLevel = null; // if set, drop items whose level > this
-    let collapseBoundary = null;
     enriched.forEach((r) => {
       if (collapseAtLevel != null && r.level > collapseAtLevel) return; // hidden inside collapsed subtree
       if (collapseAtLevel != null && r.level <= collapseAtLevel) {
