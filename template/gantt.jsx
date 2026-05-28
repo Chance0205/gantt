@@ -150,7 +150,7 @@ const totalDays = dayDiff(PROJECT_START, PROJECT_END);
 const addDays = (dt, n) => new Date(dt.getTime() + n * DAY);
 const sameDay = (a, b) => a.getTime() === b.getTime();
 const monthName = (m) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m];
-const fmtDate = (dt) => `${monthName(dt.getMonth())} ${dt.getDate()}`;
+const fmtDate = (dt) => { if (!dt) return "—"; return `${monthName(dt.getMonth())} ${dt.getDate()}`; };
 const fmtLong = (dt) => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()]}, ${monthName(dt.getMonth())} ${dt.getDate()}`;
 
 function isoWeek(dt) {
@@ -1611,7 +1611,7 @@ function GanttGrid(props) {
                     }} />
                   {lvl === 3 &&
                   <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1 }}>
-                      {fmtDate(r.start)} → {fmtDate(r.end)} · {dayDiff(r.start, r.end)}d
+                      {fmtDate(r.start)} → {fmtDate(r.end)}{r.start && r.end ? ` · ${dayDiff(r.start, r.end)}d` : ""}
                     </div>
                   }
                 </div>
@@ -1726,17 +1726,20 @@ function GanttGrid(props) {
 
               })}
             </div>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 24, height: 32 }}>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 24, bottom: 0 }}>
               {zoomLevel === "month12" ?
-              /* 12-month zoom: month 경계만 표시 */
-              months.map((m, idx) => {
-                const next = months[idx + 1];
-                const w = ((next ? next.i : viewTotalDays) - m.i) * dayW;
+              /* 12-month zoom: 주 경계 + 주 번호 */
+              weeks.map((w, idx) => {
+                const next = weeks[idx + 1];
+                const wpx = ((next ? next.i : viewTotalDays) - w.i) * dayW;
                 return (
                   <div key={idx} style={{
-                    position: "absolute", left: m.i * dayW, width: w, height: 32,
-                    borderRight: "1px dashed var(--line-2)"
-                  }} />);
+                    position: "absolute", left: w.i * dayW, width: wpx, height: "100%",
+                    borderRight: "1px dashed var(--line-2)",
+                    display: "flex", alignItems: "center", paddingLeft: 3, overflow: "hidden"
+                  }}>
+                    {wpx >= 18 && <span className="mono" style={{ fontSize: 8, color: "var(--ink-4)", letterSpacing: 0.2, whiteSpace: "nowrap" }}>W{w.w}</span>}
+                  </div>);
               }) :
               /* month1: 일 단위 셀, 주말 붉은 배경 */
               days.map((dt, i) => {
@@ -1745,7 +1748,7 @@ function GanttGrid(props) {
                 const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                 return (
                   <div key={i} style={{
-                    position: "absolute", left: i * dayW, width: dayW, height: 32,
+                    position: "absolute", left: i * dayW, width: dayW, height: "100%",
                     borderRight: isFirstOfMonth ? "1px solid var(--line)" : "1px dashed var(--line-2)",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                     background: isToday ? "rgba(138,58,31,0.12)" : isWeekend ? "rgba(200,40,40,0.07)" : "transparent"
