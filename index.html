@@ -956,7 +956,9 @@ function App() {
       const isSummary = hasChildrenAfter(items, i);
       if (!isSummary) return { ...it, isSummary: false };
       const agg = aggregateSummary(items, i);
-      return { ...it, isSummary: true, start: agg ? agg.start : addDays(PROJECT_START, 0), end: agg ? agg.end : addDays(PROJECT_START, 1), pct: agg ? agg.pct : 0, leafCount: agg ? agg.leafCount : 0 };
+      const fallbackStart = it.start || null;
+      const fallbackEnd   = it.end   || null;
+      return { ...it, isSummary: true, start: agg ? agg.start : fallbackStart, end: agg ? agg.end : fallbackEnd, pct: agg ? agg.pct : 0, leafCount: agg ? agg.leafCount : 0 };
     });
   }, [items, itemsWithCodes]);
 
@@ -2029,9 +2031,23 @@ function GanttGrid(props) {
               const usePreview = dragPreview && dragPreview.id === r.id;
               const start = usePreview ? dragPreview.start : r.start;
               const end = usePreview ? dragPreview.end : r.end;
+              const color = colorFor(r.code);
+
+              if (!start || !end) {
+                const barH = r.level === 1 ? 12 : 9;
+                const cy = i * rowH + rowH / 2;
+                return (
+                  <div key={r.id} title="날짜 미설정" style={{
+                    position: "absolute", left: 0, top: r.isSummary ? cy - barH / 2 : i * rowH + 5,
+                    width: dayW * 3, height: r.isSummary ? barH : rowH - 10,
+                    border: "1.5px dashed var(--line-2)", borderRadius: 3,
+                    opacity: 0.5, pointerEvents: "none",
+                  }} />
+                );
+              }
+
               const x = dayDiff(viewStart, start) * dayW;
               const w = Math.max(dayW * 0.7, dayDiff(start, end) * dayW);
-              const color = colorFor(r.code);
 
               if (r.isSummary) {
                 return (
@@ -2039,7 +2055,6 @@ function GanttGrid(props) {
                   isHover={hover === r.id} isFocus={focusId === r.id}
                   onEnter={() => setHover(r.id)} onLeave={() => setHover(null)}
                   onClick={() => setFocusId(focusId === r.id ? null : r.id)} />);
-
               }
               const y = i * rowH + 5;
               const h = rowH - 10;
@@ -2050,7 +2065,6 @@ function GanttGrid(props) {
                 onBarDown={(e, mode) => startBarDrag(e, r, mode)}
                 onDepDown={(e) => startDepDrag(e, r)}
                 isPreview={usePreview} />);
-
             })}
           </div>
         </div>

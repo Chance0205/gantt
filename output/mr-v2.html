@@ -1157,7 +1157,10 @@
           const isSummary = hasChildrenAfter(items, i);
           if (!isSummary) return { ...it, isSummary: false };
           const agg = aggregateSummary(items, i);
-          return { ...it, isSummary: true, start: agg ? agg.start : addDays(PROJECT_START, 0), end: agg ? agg.end : addDays(PROJECT_START, 1), pct: agg ? agg.pct : 0, leafCount: agg ? agg.leafCount : 0 };
+          // fallback: use item's own dates if children have none (prevents bar jumping to PROJECT_START)
+          const fallbackStart = it.start || (it.segments && it.segments[0]?.start) || null;
+          const fallbackEnd   = it.end   || (it.segments && it.segments[0]?.end)   || null;
+          return { ...it, isSummary: true, start: agg ? agg.start : fallbackStart, end: agg ? agg.end : fallbackEnd, pct: agg ? agg.pct : 0, leafCount: agg ? agg.leafCount : 0 };
         });
       }, [items, itemsWithCodes]);
 
@@ -2629,7 +2632,18 @@
                 {rows.map((r, i) => {
                   const color = colorFor(r.code);
                   if (r.isSummary) {
-                    if (!r.start || !r.end) return null;
+                    if (!r.start || !r.end) {
+                      const barH = r.level === 1 ? 12 : 9;
+                      const cy = i * rowH + rowH / 2;
+                      return (
+                        <div key={r.id} title="날짜 미설정" style={{
+                          position: "absolute", left: 0, top: cy - barH / 2,
+                          width: dayW * 3, height: barH,
+                          border: "1.5px dashed var(--line-2)", borderRadius: 2,
+                          opacity: 0.5, pointerEvents: "none",
+                        }} />
+                      );
+                    }
                     const x = dayDiff(viewStart, r.start) * dayW;
                     const w = Math.max(dayW * 0.7, dayDiff(r.start, r.end) * dayW);
                     return (
@@ -2651,7 +2665,17 @@
                     const usePreview = dragPreview && dragPreview.id === r.id && dragPreview.segIdx === segIdx;
                     const segStart = usePreview ? dragPreview.start : seg.start;
                     const segEnd = usePreview ? dragPreview.end : seg.end;
-                    if (!segStart || !segEnd) return null;
+                    if (!segStart || !segEnd) {
+                      if (!isFirstSeg) return null;
+                      return (
+                        <div key={`${r.id}-${segIdx}-nodate`} title="날짜 미설정" style={{
+                          position: "absolute", left: 0, top: y,
+                          width: dayW * 3, height: h,
+                          border: "1.5px dashed var(--line-2)", borderRadius: 3,
+                          opacity: 0.5, pointerEvents: "none",
+                        }} />
+                      );
+                    }
                     const x = dayDiff(viewStart, segStart) * dayW;
                     const w = Math.max(dayW * 0.7, dayDiff(segStart, segEnd) * dayW);
                     const fillFraction = computeSegFill(segs, segIdx, r.pct);
