@@ -1503,7 +1503,9 @@
         e.preventDefault();
         document.body.style.cursor = "grabbing";
         function onMove(ev) {
-          wrap.scrollLeft = startScroll - (ev.clientX - startX);
+          const next = startScroll - (ev.clientX - startX);
+          wrap.scrollLeft = next;
+          if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
         }
         function onUp() {
           window.removeEventListener("mousemove", onMove);
@@ -2182,7 +2184,9 @@
 
       useEffect(() => {
         if (scrollWrapRef.current) {
-          scrollWrapRef.current.scrollLeft = Math.max(0, todayX - 360);
+          const sx = Math.max(0, todayX - 360);
+          scrollWrapRef.current.scrollLeft = sx;
+          if (headerScrollRef.current) headerScrollRef.current.scrollLeft = sx;
         }
       }, [todayX, scrollWrapRef]);
 
