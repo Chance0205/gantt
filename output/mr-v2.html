@@ -3465,7 +3465,13 @@
 
     // ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
     function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin }) {
-      const toInputDate = (dt) => dt instanceof Date ? dt.toISOString().slice(0, 10) : '';
+      const toInputDate = (dt) => {
+        if (!(dt instanceof Date)) return '';
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
       const singleSeg = !item.isSummary && (!item.segments || item.segments.length <= 1);
       const multiSeg  = !item.isSummary && item.segments && item.segments.length > 1;
 
