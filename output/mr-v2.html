@@ -821,8 +821,13 @@
         } else {
           item.segments = [{ start: item.start, end: item.end }];
         }
-        if (!Array.isArray(item.owners)) {
-          item.owners = item.owner ? [item.owner] : [];
+        // owners 배열 → owner(단수) + collaborators(복수) 마이그레이션
+        if (Array.isArray(item.owners)) {
+          if (!item.owner) item.owner = item.owners[0] || null;
+          if (!item.collaborators) item.collaborators = item.owners.slice(1);
+          delete item.owners;
+        } else {
+          item.collaborators = item.collaborators || [];
         }
         if (item.notes === undefined) item.notes = "";
         return item;
@@ -954,7 +959,8 @@
         if (Object.keys(renames).length > 0) {
           setItems((prev) => prev.map((it) => ({
             ...it,
-            owners: (it.owners || []).map((id) => renames[id] ?? id),
+            owner: renames[it.owner] ?? it.owner,
+            collaborators: (it.collaborators || []).map((id) => renames[id] ?? id),
           })));
         }
       }, []);
@@ -979,7 +985,8 @@
         if (Object.keys(renames).length > 0) {
           setItems((prev) => prev.map((it) => ({
             ...it,
-            owners: (it.owners || []).map((id) => renames[id] ?? id),
+            owner: renames[it.owner] ?? it.owner,
+            collaborators: (it.collaborators || []).map((id) => renames[id] ?? id),
           })));
         }
       }, []);
@@ -1014,7 +1021,8 @@
           const base = (it.segments && it.segments.length > 0) ? it : { ...it, segments: [{ start: it.start, end: it.end }] };
           return {
             ...base,
-            owners: Array.isArray(base.owners) ? base.owners : (base.owner ? [base.owner] : []),
+            owner: base.owner || (Array.isArray(base.owners) ? (base.owners[0] || null) : null),
+            collaborators: base.collaborators || (Array.isArray(base.owners) ? base.owners.slice(1) : []),
             notes: base.notes || "",
           };
         });
@@ -1027,6 +1035,9 @@
 
       // Persist on every change (localStorage).
       useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams, vendors); }, [items, collapsed, meta, owners, teams, vendors]);
+
+      // ── URL 파라미터: ?user=AA → 해당 오너만 자기 태스크 편집 가능 ────────
+      const currentUser = new URLSearchParams(window.location.search).get('user') || null;
 
       // ── Auto-save to local save server ───────────────────────────────────
       const SAVE_FILENAME = STORAGE_KEY + '.json';
@@ -1251,8 +1262,8 @@
         if (v.owner !== "all") {
           const team = teams.find((t) => t.id === v.owner);
           const matchOwner = team
-            ? (r) => (r.owners || []).some((o) => team.members.includes(o))
-            : (r) => (r.owners || []).includes(v.owner);
+            ? (r) => team.members.includes(r.owner) || (r.collaborators || []).some((o) => team.members.includes(o))
+            : (r) => r.owner === v.owner || (r.collaborators || []).includes(v.owner);
           keepIds = new Set();
           enriched.forEach((r, i) => {
             if (!r.isSummary && matchOwner(r)) {
@@ -1370,7 +1381,7 @@
         setItems((items) => {
           if (!afterId) {
             return [...items, {
-              id, level: 1, name: "New task", owners: firstOwner ? [firstOwner] : [],
+              id, level: 1, name: "New task", owner: currentUser || firstOwner || null, collaborators: [],
               start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
               segments: [{ start: addDays(TODAY, 1), end: addDays(TODAY, 8) }], notes: "",
             }];
@@ -1382,13 +1393,13 @@
           const row = items[idx];
           const level = Math.min(row.level + 1, 3);
           const parentIsSummary = hasChildrenAfter(items, idx);
-          const validParentOwners = (row.owners || []).filter(o => owners[o]);
-          const ownerIds = parentIsSummary ? [] : (validParentOwners.length > 0 ? validParentOwners : (firstOwner ? [firstOwner] : []));
+          const parentOwner = row.owner && owners[row.owner] ? row.owner : null;
+          const newOwner = parentIsSummary ? null : (currentUser || parentOwner || firstOwner || null);
 
           const [, subEnd] = subtreeRange(items, idx);
           const next = [...items];
           next.splice(subEnd + 1, 0, {
-            id, level, name: "New task", owners: ownerIds,
+            id, level, name: "New task", owner: newOwner, collaborators: [],
             start: addDays(TODAY, 1), end: addDays(TODAY, 8), pct: 0,
             segments: [{ start: addDays(TODAY, 1), end: addDays(TODAY, 8) }], notes: "",
           });
@@ -1700,7 +1711,8 @@
       const ownerTaskCounts = useMemo(() => {
         const map = {};
         enriched.filter((r) => !r.isSummary).forEach((r) => {
-          (r.owners || []).forEach((id) => { map[id] = (map[id] || 0) + 1; });
+          if (r.owner) map[r.owner] = (map[r.owner] || 0) + 1;
+          (r.collaborators || []).forEach((id) => { map[id] = (map[id] || 0) + 1; });
         });
         return map;
       }, [enriched]);
@@ -1761,7 +1773,9 @@
                 deleteItem={deleteItem}
                 setPendingDelete={setPendingDelete}
                 setCtxMenu={setCtxMenu}
-                deleteSegment={deleteSegment} />
+                deleteSegment={deleteSegment}
+                currentUser={currentUser}
+                isAdmin={isAdmin} />
 
             </div>
             <Footer enriched={enriched} />
@@ -2219,10 +2233,12 @@
         startBarDrag, startDepDrag, startRowDrag, startPan,
         dragPreview, depDrag, rowDrag, scrollWrapRef, headerScrollRef,
         removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, updateItemSegment, deleteItem,
-        setPendingDelete, setCtxMenu, deleteSegment
+        setPendingDelete, setCtxMenu, deleteSegment, currentUser, isAdmin
       } = props;
 
       const { owners: ctxOwners } = React.useContext(OwnersCtx);
+      // currentUser가 설정된 경우, 본인 태스크만 편집 가능
+      const canEdit = (r) => !currentUser || r.owner === currentUser;
       const [detailId, setDetailId] = useState(null);
       const headerH = 56;
       const totalRowsHeight = rows.length * rowH;
@@ -2373,15 +2389,17 @@
 
                     {r.isSummary
                       ? <span className="mono" style={{ fontSize: 9.5, color: "var(--ink-4)" }}>{r.leafCount || 0}</span>
-                      : <OwnersPicker values={r.owners || []} onChange={(vals) => updateItem(r.id, { owners: vals })} />}
-                    <PctChip pct={r.pct} editable={!r.isSummary} onChange={(val) => updateItem(r.id, { pct: val })} />
+                      : <OwnerSinglePicker value={r.owner || null}
+                          onChange={isAdmin ? (val) => updateItem(r.id, { owner: val }) : null}
+                          hasCollabs={(r.collaborators || []).length > 0} />}
+                    <PctChip pct={r.pct} editable={!r.isSummary && canEdit(r)} onChange={(val) => updateItem(r.id, { pct: val })} />
 
                     {/* 행별 + / ✕ 버튼 — absolute 배치로 flex 레이아웃에 영향 없음 */}
                     <div style={{
                       position: "absolute", right: 90, top: "50%", transform: "translateY(-50%)",
                       display: "flex", gap: 3, zIndex: 3,
-                      opacity: isHover ? 1 : 0,
-                      pointerEvents: isHover ? "auto" : "none",
+                      opacity: isHover && canEdit(r) ? 1 : 0,
+                      pointerEvents: isHover && canEdit(r) ? "auto" : "none",
                       transition: "opacity 120ms",
                     }}>
                       <span
@@ -2801,9 +2819,9 @@
                         x={x} y={y} w={w} h={h} color={color}
                         isHover={hover === r.id} isFocus={focusId === r.id}
                         onEnter={() => setHover(r.id)} onLeave={() => setHover(null)}
-                        onBarDown={(e, mode) => startBarDrag(e, r, mode, segIdx)}
+                        onBarDown={canEdit(r) ? (e, mode) => startBarDrag(e, r, mode, segIdx) : () => {}}
                         onDepDown={(e) => startDepDrag(e, r)}
-                        onDeleteSeg={() => deleteSegment(r.id, segIdx)}
+                        onDeleteSeg={canEdit(r) ? () => deleteSegment(r.id, segIdx) : null}
                         onDoubleClick={() => setDetailId(r.id)}
                         isPreview={usePreview} />
                     );
@@ -2816,6 +2834,7 @@
           {detailId && (() => {
             const detailItem = rows.find((r) => r.id === detailId);
             return detailItem ? <TaskDetailCard item={detailItem} rows={rows} onClose={() => setDetailId(null)}
+              canEdit={canEdit(detailItem)} isAdmin={isAdmin}
               onSave={(patch) => {
                 const { start, end, ...rest } = patch;
                 updateItem(detailId, rest);
@@ -2925,8 +2944,9 @@
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   width: 14, height: 14, borderRadius: 99, background: "rgba(0,0,0,0.35)",
                   color: "var(--paper)", fontSize: 8.5, letterSpacing: 0.5, flexShrink: 0
-                }} className="mono">{(r.owners || [])[0] || ""}</span>
+                }} className="mono">{r.owner || ""}</span>
                 {w > 80 && <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>}
+                {w > 120 && (r.collaborators || []).length > 0 && <span style={{ fontSize: 8, opacity: 0.6, flexShrink: 0 }}>+{r.collaborators.length}</span>}
                 {w > 160 && <span className="mono" style={{ marginLeft: "auto", fontSize: 10, opacity: 0.85 }}>{r.pct}%</span>}
               </React.Fragment>
             );
@@ -3158,6 +3178,63 @@
       );
     }
 
+    // 단일 담당자 피커 (WBS 행 인라인용)
+    function OwnerSinglePicker({ value, onChange, hasCollabs }) {
+      const { owners: ctxOwners } = React.useContext(OwnersCtx);
+      const [open, setOpen] = useState(false);
+      const o = value ? ctxOwners[value] : null;
+      const tint = o?.tint || "var(--ink-4)";
+
+      return (
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 3 }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); if (onChange) setOpen((x) => !x); }}
+            title={o ? o.name : "담당자 없음"}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 20, height: 20, borderRadius: 99,
+              background: o ? tint : "var(--line)",
+              color: "var(--paper)", fontSize: 9, fontWeight: 600, letterSpacing: 0.3,
+              cursor: onChange ? "pointer" : "default",
+              border: hasCollabs ? `2px solid ${tint}` : "none",
+              boxSizing: "border-box",
+            }} className="mono">
+            {value || "—"}
+          </span>
+          {hasCollabs && <span style={{ fontSize: 8, color: "var(--ink-4)", lineHeight: 1 }}>+</span>}
+          {open && onChange && (
+            <div onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute", top: "100%", left: 0, zIndex: 200,
+                background: "var(--paper-2)", border: "1px solid var(--line)",
+                borderRadius: 4, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.25)",
+                minWidth: 130, padding: 4,
+              }}>
+              <div
+                onClick={() => { onChange(null); setOpen(false); }}
+                style={{ padding: "5px 10px", cursor: "pointer", fontSize: 12, color: "var(--ink-3)", borderRadius: 3 }}>
+                — 없음
+              </div>
+              {Object.entries(ctxOwners).map(([id, ow]) => (
+                <div key={id}
+                  onClick={() => { onChange(id); setOpen(false); }}
+                  style={{
+                    padding: "5px 10px", cursor: "pointer", fontSize: 12,
+                    color: id === value ? "var(--paper)" : "var(--ink)",
+                    background: id === value ? (ow.tint || "var(--ink)") : "transparent",
+                    borderRadius: 3, display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                  <span className="mono" style={{ fontWeight: 600, fontSize: 10 }}>{id}</span>
+                  {ow.name}
+                </div>
+              ))}
+            </div>
+          )}
+          {open && <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setOpen(false)} />}
+        </span>
+      );
+    }
+
     function OwnersPicker({ values, onChange }) {
       const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
       const [open, setOpen] = useState(false);
@@ -3336,7 +3413,7 @@
     }
 
     // ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
-    function TaskDetailCard({ item, rows, onClose, onSave }) {
+    function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin }) {
       const toInputDate = (dt) => dt instanceof Date ? dt.toISOString().slice(0, 10) : '';
       const singleSeg = !item.isSummary && (!item.segments || item.segments.length <= 1);
 
@@ -3344,14 +3421,16 @@
       const [editStart, setEditStart] = useState(toInputDate(item.start));
       const [editEnd, setEditEnd]     = useState(toInputDate(item.end));
       const [editPct, setEditPct]     = useState(item.pct ?? 0);
-      const [editOwners, setEditOwners] = useState(item.owners || []);
+      const [editOwner, setEditOwner] = useState(item.owner || null);
+      const [editCollabs, setEditCollabs] = useState(item.collaborators || []);
       const [saved, setSaved] = useState(false);
 
       const handleSave = () => {
         onSave({
           notes,
           pct: editPct,
-          owners: editOwners,
+          owner: editOwner,
+          collaborators: editCollabs,
           start: editStart ? new Date(editStart + 'T00:00:00') : item.start,
           end:   editEnd   ? new Date(editEnd   + 'T00:00:00') : item.end,
         });
@@ -3396,9 +3475,9 @@
             {/* Edit fields */}
             <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "68px 1fr", rowGap: 14, columnGap: 14, alignItems: "center" }}>
 
-              {/* 기간 — 단일 세그먼트 리프만 편집 가능 */}
+              {/* 기간 — 단일 세그먼트 리프이고 canEdit인 경우만 편집 */}
               <span className="mono small-caps" style={labelStyle}>기간</span>
-              {singleSeg ? (
+              {singleSeg && canEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)}
                     style={dateInput}
@@ -3420,9 +3499,9 @@
                 </span>
               )}
 
-              {/* 진행률 — 리프만 편집 가능 */}
+              {/* 진행률 — 리프이고 canEdit인 경우만 편집 */}
               <span className="mono small-caps" style={labelStyle}>진행률</span>
-              {!item.isSummary ? (
+              {!item.isSummary && canEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input type="range" min="0" max="100" step="5" value={editPct}
                     onChange={(e) => setEditPct(Number(e.target.value))}
@@ -3443,9 +3522,17 @@
                 </span>
               )}
 
-              {/* 담당자 */}
+              {/* 담당자 (단일) */}
               <span className="mono small-caps" style={{ ...labelStyle, alignSelf: "flex-start", paddingTop: 6 }}>담당자</span>
-              <OwnersPicker values={editOwners} onChange={setEditOwners} />
+              {isAdmin
+                ? <OwnerSinglePicker value={editOwner} onChange={setEditOwner} hasCollabs={false} />
+                : <OwnerSinglePicker value={editOwner} onChange={null} hasCollabs={false} />}
+
+              {/* 협력자 (다중) */}
+              <span className="mono small-caps" style={{ ...labelStyle, alignSelf: "flex-start", paddingTop: 6 }}>협력자</span>
+              {canEdit
+                ? <OwnersPicker values={editCollabs} onChange={setEditCollabs} excludeOwner={editOwner} />
+                : <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{editCollabs.length > 0 ? editCollabs.join(", ") : "—"}</span>}
 
               {/* 구간 — 멀티 세그먼트 read-only */}
               {item.segments && item.segments.length > 1 && (
@@ -3504,8 +3591,9 @@
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
               {saved && <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", marginRight: "auto" }}>저장됨 ✓</span>}
+              {!canEdit && <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)", marginRight: "auto" }}>읽기 전용</span>}
               <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>닫기</button>
-              <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>
+              {canEdit && <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>}
             </div>
           </div>
         </div>
