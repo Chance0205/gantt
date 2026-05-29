@@ -2444,12 +2444,25 @@
           {/* HEADER — sticky, 가로 스크롤은 JS로 동기화 */}
           <div ref={headerScrollRef} style={{ overflowX: "hidden", overflowY: "clip", flexShrink: 0, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
             <div style={{ width: timelineW, position: "relative" }}>
-              {/* Today diamond — rendered in sticky header so it's always visible */}
-              {todayX >= 0 && <div style={{
-                position: "absolute", bottom: -5, left: todayX - 4,
-                width: 9, height: 9, background: "var(--accent)",
-                transform: "rotate(45deg)", pointerEvents: "none", zIndex: 25
-              }} />}
+              {/* Today marker — diamond + date label in sticky header */}
+              {todayX >= 0 && <>
+                <div style={{
+                  position: "absolute", bottom: 2, left: todayX - 4,
+                  width: 9, height: 9, background: "var(--accent)",
+                  transform: "rotate(45deg)", pointerEvents: "none", zIndex: 25
+                }} />
+                {zoomLevel === "month12" && <div style={{
+                  position: "absolute", bottom: 13, left: todayX,
+                  transform: "translateX(-50%)",
+                  background: "var(--accent)", color: "var(--paper)",
+                  fontFamily: "IBM Plex Mono, monospace", fontSize: 9, fontWeight: 600,
+                  padding: "2px 5px", borderRadius: 2, whiteSpace: "nowrap", letterSpacing: 0.4,
+                  lineHeight: 1.4, pointerEvents: "none", zIndex: 25
+                }}>
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][TODAY.getDay()]}
+                  {" "}{TODAY.getMonth() + 1}/{TODAY.getDate()}
+                </div>}
+              </>}
               <div style={{ height: headerH, borderBottom: "1px solid var(--line)" }}>
                 <div style={{ position: "absolute", inset: 0, height: 24, borderBottom: "1px solid var(--line)" }}>
                   {months.map((m, idx) => {
@@ -2707,18 +2720,6 @@
                   position: "absolute", top: 0, left: todayX, width: 1, height: totalRowsHeight,
                   background: "var(--accent)", pointerEvents: "none", zIndex: 25
                 }}>
-                  {zoomLevel === "month12" && (
-                    <div style={{
-                      position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)",
-                      background: "var(--accent)", color: "var(--paper)",
-                      fontFamily: "IBM Plex Mono, monospace", fontSize: 9, fontWeight: 600,
-                      padding: "2px 5px", borderRadius: 2, whiteSpace: "nowrap", letterSpacing: 0.4,
-                      lineHeight: 1.4
-                    }}>
-                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][TODAY.getDay()]}
-                      {" "}{TODAY.getMonth() + 1}/{TODAY.getDate()}
-                    </div>
-                  )}
                 </div>
 
                 {/* BARS */}
