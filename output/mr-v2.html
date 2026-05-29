@@ -899,8 +899,10 @@
     //                           APP
     // ====================================================================
     function App() {
-      // ?view 파라미터가 있으면 뷰어 모드 (리셋·팀편집·임포트 숨김)
-      const isAdmin = !new URLSearchParams(window.location.search).has("view");
+      // URL 파라미터 읽기
+      const currentUser = new URLSearchParams(window.location.search).get('user') || null;
+      // ?view 파라미터이거나 ?user=CS이면 어드민 (모든 태스크 편집 가능)
+      const isAdmin = !new URLSearchParams(window.location.search).has("view") || currentUser === 'CS';
 
       const [v, setTweak] = window.useTweaks ? window.useTweaks({
         accent: "#8a3a1f",
@@ -1035,9 +1037,6 @@
 
       // Persist on every change (localStorage).
       useEffect(() => { saveToStorage(items, collapsed, meta, owners, teams, vendors); }, [items, collapsed, meta, owners, teams, vendors]);
-
-      // ── URL 파라미터: ?user=AA → 해당 오너만 자기 태스크 편집 가능 ────────
-      const currentUser = new URLSearchParams(window.location.search).get('user') || null;
 
       // ── Auto-save to local save server ───────────────────────────────────
       const SAVE_FILENAME = STORAGE_KEY + '.json';
@@ -2237,8 +2236,8 @@
       } = props;
 
       const { owners: ctxOwners } = React.useContext(OwnersCtx);
-      // currentUser가 설정된 경우, 본인 태스크만 편집 가능
-      const canEdit = (r) => !currentUser || r.owner === currentUser;
+      // CS는 어드민 권한으로 모든 태스크 편집 가능, 나머지는 본인 태스크만
+      const canEdit = (r) => !currentUser || currentUser === 'CS' || r.owner === currentUser;
       const [detailId, setDetailId] = useState(null);
       const headerH = 56;
       const totalRowsHeight = rows.length * rowH;
