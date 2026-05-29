@@ -1057,7 +1057,7 @@
         // Check if a real save server exists (Claude Code web env).
         // Local python http.server has no /ping, so hasServer=false.
         // When no save server, always prefer JSON (git pull is the source of truth).
-        const hasSaveServer = fetch('/ping').then((r) => r.ok).catch(() => false);
+        const hasSaveServer = isLocal ? fetch('/ping').then((r) => r.ok).catch(() => false) : Promise.resolve(false);
         hasSaveServer.then((hasServer) => {
           fetch('./' + SAVE_FILENAME + '?t=' + Date.now())
             .then((r) => r.ok ? r.json() : null)
