@@ -2716,10 +2716,14 @@ body {
             return detailItem ? <TaskDetailCard item={detailItem} rows={rows} onClose={() => setDetailId(null)}
               canEdit={canEdit(detailItem)} isAdmin={isAdmin}
               onSave={(patch) => {
-                const { start, end, ...rest } = patch;
+                const { start, end, segments, ...rest } = patch;
                 updateItem(detailId, rest);
-                if (!detailItem.isSummary && (start || end)) {
-                  updateItemSegment(detailId, 0, { start: start || detailItem.start, end: end || detailItem.end });
+                if (!detailItem.isSummary) {
+                  if (segments && segments.length > 0) {
+                    segments.forEach((seg, i) => updateItemSegment(detailId, i, seg));
+                  } else if (start || end) {
+                    updateItemSegment(detailId, 0, { start: start || detailItem.start, end: end || detailItem.end });
+                  }
                 }
               }} /> : null;
           })()}
@@ -3072,16 +3076,15 @@ body {
             title={o ? o.name : "담당자 없음"}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 20, height: 20, borderRadius: 99,
+              width: 22, height: 22, borderRadius: 99,
               background: o ? tint : "var(--line)",
-              color: "var(--paper)", fontSize: 9, fontWeight: 600, letterSpacing: 0.3,
+              color: "var(--paper)", fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3,
               cursor: onChange ? "pointer" : "default",
               border: hasCollabs ? `2px solid ${tint}` : "none",
               boxSizing: "border-box",
             }} className="mono">
             {value || "—"}
           </span>
-          {hasCollabs && <span style={{ fontSize: 8, color: "var(--ink-4)", lineHeight: 1 }}>+</span>}
           {open && onChange && (
             <div onClick={(e) => e.stopPropagation()}
               style={{
@@ -3296,24 +3299,31 @@ body {
     function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin }) {
       const toInputDate = (dt) => dt instanceof Date ? dt.toISOString().slice(0, 10) : '';
       const singleSeg = !item.isSummary && (!item.segments || item.segments.length <= 1);
+      const multiSeg  = !item.isSummary && item.segments && item.segments.length > 1;
 
       const [notes, setNotes] = useState(item.notes || "");
       const [editStart, setEditStart] = useState(toInputDate(item.start));
       const [editEnd, setEditEnd]     = useState(toInputDate(item.end));
+      const [editSegs, setEditSegs]   = useState(
+        (item.segments || []).map(s => ({ start: toInputDate(s.start), end: toInputDate(s.end) }))
+      );
       const [editPct, setEditPct]     = useState(item.pct ?? 0);
       const [editOwner, setEditOwner] = useState(item.owner || null);
       const [editCollabs, setEditCollabs] = useState(item.collaborators || []);
       const [saved, setSaved] = useState(false);
 
       const handleSave = () => {
-        onSave({
-          notes,
-          pct: editPct,
-          owner: editOwner,
-          collaborators: editCollabs,
-          start: editStart ? new Date(editStart + 'T00:00:00') : item.start,
-          end:   editEnd   ? new Date(editEnd   + 'T00:00:00') : item.end,
-        });
+        const patch = { notes, pct: editPct, owner: editOwner, collaborators: editCollabs };
+        if (singleSeg) {
+          patch.start = editStart ? new Date(editStart + 'T00:00:00') : item.start;
+          patch.end   = editEnd   ? new Date(editEnd   + 'T00:00:00') : item.end;
+        } else if (multiSeg) {
+          patch.segments = editSegs.map(s => ({
+            start: s.start ? new Date(s.start + 'T00:00:00') : null,
+            end:   s.end   ? new Date(s.end   + 'T00:00:00') : null,
+          }));
+        }
+        onSave(patch);
         setSaved(true);
         setTimeout(() => setSaved(false), 1800);
       };
@@ -3414,12 +3424,21 @@ body {
                 ? <OwnersPicker values={editCollabs} onChange={setEditCollabs} />
                 : <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{editCollabs.length > 0 ? editCollabs.join(", ") : "—"}</span>}
 
-              {/* 구간 — 멀티 세그먼트 read-only */}
-              {item.segments && item.segments.length > 1 && (
+              {/* 구간 — 멀티 세그먼트 */}
+              {multiSeg && (
                 <React.Fragment>
                   <span className="mono small-caps" style={{ ...labelStyle, alignSelf: "flex-start", paddingTop: 2 }}>구간</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {item.segments.map((seg, i) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {canEdit ? editSegs.map((seg, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span className="mono" style={{ fontSize: 11, color: "var(--ink-4)", minWidth: 16 }}>{i + 1}.</span>
+                        <input type="date" value={seg.start} onChange={(e) => { const ns = [...editSegs]; ns[i] = { ...ns[i], start: e.target.value }; setEditSegs(ns); }}
+                          style={dateInput} onFocus={(e) => e.target.style.borderColor = "var(--accent)"} onBlur={(e) => e.target.style.borderColor = "var(--line-2)"} />
+                        <span style={{ color: "var(--ink-4)", fontSize: 11 }}>→</span>
+                        <input type="date" value={seg.end} onChange={(e) => { const ns = [...editSegs]; ns[i] = { ...ns[i], end: e.target.value }; setEditSegs(ns); }}
+                          style={dateInput} onFocus={(e) => e.target.style.borderColor = "var(--accent)"} onBlur={(e) => e.target.style.borderColor = "var(--line-2)"} />
+                      </div>
+                    )) : item.segments.map((seg, i) => (
                       <span key={i} className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>
                         {i + 1}. {seg.start ? fmtDate(seg.start) : "—"} → {seg.end ? fmtDate(seg.end) : "—"}
                       </span>
