@@ -1059,7 +1059,7 @@
         // When no save server, always prefer JSON (git pull is the source of truth).
         const hasSaveServer = fetch('/ping').then((r) => r.ok).catch(() => false);
         hasSaveServer.then((hasServer) => {
-          fetch('./' + SAVE_FILENAME)
+          fetch('./' + SAVE_FILENAME + '?t=' + Date.now())
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
               if (!data || !data.items) return;
