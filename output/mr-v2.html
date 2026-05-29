@@ -2760,7 +2760,8 @@
                       <SummaryBar key={r.id} r={r} i={i} x={x} w={w} rowH={rowH} color={color}
                         isHover={hover === r.id} isFocus={focusId === r.id}
                         onEnter={() => setHover(r.id)} onLeave={() => setHover(null)}
-                        onClick={() => setFocusId(focusId === r.id ? null : r.id)} />
+                        onClick={() => setFocusId(focusId === r.id ? null : r.id)}
+                        onDoubleClick={() => setDetailId(r.id)} />
                     );
                   }
                   const y = i * rowH + 5;
@@ -2801,6 +2802,7 @@
                         onBarDown={(e, mode) => startBarDrag(e, r, mode, segIdx)}
                         onDepDown={(e) => startDepDrag(e, r)}
                         onDeleteSeg={() => deleteSegment(r.id, segIdx)}
+                        onDoubleClick={() => setDetailId(r.id)}
                         isPreview={usePreview} />
                     );
                   });
@@ -2837,7 +2839,7 @@
     // ====================================================================
     //                       BARS
     // ====================================================================
-    function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeave, onClick }) {
+    function SummaryBar({ r, i, x, w, rowH, color, isHover, isFocus, onEnter, onLeave, onClick, onDoubleClick }) {
       const lvl = r.level;
       const cy = i * rowH + rowH / 2;
       const barH = lvl === 1 ? 12 : 9;
@@ -2846,6 +2848,7 @@
         <div onMouseEnter={onEnter} onMouseLeave={onLeave}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onClick(); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
           style={{
             position: "absolute", left: x, top: cy - barH / 2, width: w, height: barH,
             cursor: "pointer", zIndex: isHover || isFocus ? 4 : 2
@@ -2876,12 +2879,13 @@
 
     function LeafBar({ r, segIdx, totalSegs, isFirstSeg, isLastSeg, fillFraction,
       x, y, w, h, color, isHover, isFocus, onEnter, onLeave,
-      onBarDown, onDepDown, isPreview, previewStart, previewEnd, onDeleteSeg }) {
+      onBarDown, onDepDown, isPreview, previewStart, previewEnd, onDeleteSeg, onDoubleClick }) {
       const fillW = (w - 2) * fillFraction;
       const handleW = 6;
       return (
         <div onMouseEnter={onEnter} onMouseLeave={onLeave}
           onMouseDown={(e) => { e.stopPropagation(); onBarDown(e, "move"); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
           style={{
             position: "absolute", left: x, top: y, width: w, height: h,
             background: "var(--paper)",
