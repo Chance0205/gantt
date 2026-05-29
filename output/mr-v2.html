@@ -690,8 +690,9 @@
 
     // ---------- helpers ----------
     const DAY = 86400000;
-    const dayDiff = (a, b) => Math.round((b - a) / DAY);
-    const addDays = (dt, n) => new Date(dt.getTime() + n * DAY);
+    const dayDiff = (a, b) => Math.floor((b - a) / DAY);
+    const toMidnight = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const addDays = (dt, n) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + n);
     const monthName = (m) => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m];
     const fmtDate = (dt) => { if (!dt) return "—"; return `${monthName(dt.getMonth())} ${dt.getDate()}`; };
     const fmtLong = (dt) => `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dt.getDay()]}, ${monthName(dt.getMonth())} ${dt.getDate()}`;
@@ -810,13 +811,13 @@
       return raw.map((it) => {
         const item = {
           ...it,
-          start: it.start ? new Date(it.start) : undefined,
-          end: it.end ? new Date(it.end) : undefined,
+          start: it.start ? toMidnight(new Date(it.start)) : undefined,
+          end: it.end ? toMidnight(new Date(it.end)) : undefined,
         };
         if (it.segments && it.segments.length > 0) {
           item.segments = it.segments.map(s => ({
-            start: s.start ? new Date(s.start) : undefined,
-            end: s.end ? new Date(s.end) : undefined,
+            start: s.start ? toMidnight(new Date(s.start)) : undefined,
+            end: s.end ? toMidnight(new Date(s.end)) : undefined,
           }));
         } else {
           item.segments = [{ start: item.start, end: item.end }];
