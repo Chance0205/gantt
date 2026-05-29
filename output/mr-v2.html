@@ -613,7 +613,7 @@
         today: null,  // null이면 실제 오늘 날짜 사용
 
         // ── 저장소 키 (프로젝트마다 고유하게) ─────────────────────────
-        storageKey: "project-gantt-v1",
+        storageKey: "mr-v2-gantt-state-v1",
 
         // ── 팀 ────────────────────────────────────────────────────────
         teams: [
@@ -1055,7 +1055,7 @@
         // When no save server, always prefer JSON (git pull is the source of truth).
         const hasSaveServer = fetch('/ping').then((r) => r.ok).catch(() => false);
         hasSaveServer.then((hasServer) => {
-          fetch('/' + SAVE_FILENAME)
+          fetch('./' + SAVE_FILENAME)
             .then((r) => r.ok ? r.json() : null)
             .then((data) => {
               if (!data || !data.items) return;
