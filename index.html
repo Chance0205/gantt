@@ -1697,7 +1697,8 @@ body {
                 setCtxMenu={setCtxMenu}
                 deleteSegment={deleteSegment}
                 currentUser={currentUser}
-                isAdmin={isAdmin} />
+                isAdmin={isAdmin}
+                allRows={enriched} />
 
             </div>
             <Footer enriched={enriched} />
@@ -2114,7 +2115,7 @@ body {
         startBarDrag, startDepDrag, startRowDrag, startPan,
         dragPreview, depDrag, rowDrag, scrollWrapRef, headerScrollRef,
         removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, updateItemSegment, deleteItem,
-        setPendingDelete, setCtxMenu, deleteSegment, currentUser, isAdmin
+        setPendingDelete, setCtxMenu, deleteSegment, currentUser, isAdmin, allRows
       } = props;
 
       const { owners: ctxOwners } = React.useContext(OwnersCtx);
@@ -2364,13 +2365,13 @@ body {
               {todayX >= 0 && <>
                 <div style={{
                   position: "absolute", bottom: 2, left: todayX - 4,
-                  width: 9, height: 9, background: "var(--accent)",
+                  width: 9, height: 9, background: "rgba(138,58,31,0.55)",
                   transform: "rotate(45deg)", pointerEvents: "none", zIndex: 25
                 }} />
                 {zoomLevel === "month12" && <div style={{
                   position: "absolute", bottom: 13, left: todayX,
                   transform: "translateX(-50%)",
-                  background: "var(--accent)", color: "var(--paper)",
+                  background: "rgba(138,58,31,0.55)", color: "var(--paper)",
                   fontFamily: "IBM Plex Mono, monospace", fontSize: 9, fontWeight: 600,
                   padding: "2px 5px", borderRadius: 2, whiteSpace: "nowrap", letterSpacing: 0.4,
                   lineHeight: 1.4, pointerEvents: "none", zIndex: 25
@@ -2634,7 +2635,7 @@ body {
                 {/* TODAY */}
                 <div style={{
                   position: "absolute", top: 0, left: todayX, width: 1, height: totalRowsHeight,
-                  background: "var(--accent)", pointerEvents: "none", zIndex: 25
+                  background: "rgba(138,58,31,0.3)", pointerEvents: "none", zIndex: 25
                 }}>
                 </div>
 
@@ -2713,7 +2714,7 @@ body {
           </div>
           {detailId && (() => {
             const detailItem = rows.find((r) => r.id === detailId);
-            return detailItem ? <TaskDetailCard item={detailItem} rows={rows} onClose={() => setDetailId(null)}
+            return detailItem ? <TaskDetailCard item={detailItem} rows={allRows || rows} onClose={() => setDetailId(null)}
               canEdit={canEdit(detailItem)} isAdmin={isAdmin}
               onSave={(patch) => {
                 const { start, end, segments, ...rest } = patch;
