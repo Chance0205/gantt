@@ -1077,10 +1077,8 @@
               const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
               const localRaw = localStorage.getItem(STORAGE_KEY);
               const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
-              // GitHub Pages: localStorage could be newer if a save failed → use whichever is newer
-              // Local no-server: JSON from git is ground truth
-              const shouldLoadServer = isGitHubPages ? serverTime >= localTime : (!hasServer || serverTime >= localTime);
-              if (shouldLoadServer) {
+              // No save server = local mode: JSON from git is ground truth, ignore localStorage timestamp
+              if (!hasServer || serverTime >= localTime) {
                 const restored = deserializeItems(data.items);
                 if (restored) {
                   setItems(restored);
