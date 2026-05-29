@@ -2504,7 +2504,7 @@
             </div>
           </div>
           {/* BODY — 가로 스크롤 컨테이너 */}
-          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "clip", position: "relative" }}
+          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "visible", position: "relative" }}
             onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
             <div style={{ width: timelineW, position: "relative" }}>
               {/* BODY (pan capture surface) */}
