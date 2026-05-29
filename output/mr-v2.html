@@ -2444,6 +2444,12 @@
           {/* HEADER — sticky, 가로 스크롤은 JS로 동기화 */}
           <div ref={headerScrollRef} style={{ overflowX: "hidden", overflowY: "clip", flexShrink: 0, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
             <div style={{ width: timelineW, position: "relative" }}>
+              {/* Today diamond — rendered in sticky header so it's always visible */}
+              {todayX >= 0 && <div style={{
+                position: "absolute", bottom: -5, left: todayX - 4,
+                width: 9, height: 9, background: "var(--accent)",
+                transform: "rotate(45deg)", pointerEvents: "none", zIndex: 25
+              }} />}
               <div style={{ height: headerH, borderBottom: "1px solid var(--line)" }}>
                 <div style={{ position: "absolute", inset: 0, height: 24, borderBottom: "1px solid var(--line)" }}>
                   {months.map((m, idx) => {
@@ -2701,10 +2707,6 @@
                   position: "absolute", top: 0, left: todayX, width: 1, height: totalRowsHeight,
                   background: "var(--accent)", pointerEvents: "none", zIndex: 25
                 }}>
-                  <div style={{
-                    position: "absolute", top: -6, left: -4, width: 9, height: 9,
-                    background: "var(--accent)", transform: "rotate(45deg)"
-                  }} />
                   {zoomLevel === "month12" && (
                     <div style={{
                       position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)",
