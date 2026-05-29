@@ -902,7 +902,7 @@
       // URL 파라미터 읽기
       const currentUser = new URLSearchParams(window.location.search).get('user') || null;
       // ?view 파라미터이거나 ?user=CS이면 어드민 (모든 태스크 편집 가능)
-      const isAdmin = !new URLSearchParams(window.location.search).has("view") || currentUser === 'CS';
+      const isAdmin = currentUser === 'CS';
 
       const [v, setTweak] = window.useTweaks ? window.useTweaks({
         accent: "#8a3a1f",
@@ -2238,7 +2238,7 @@
 
       const { owners: ctxOwners } = React.useContext(OwnersCtx);
       // CS는 어드민 권한으로 모든 태스크 편집 가능, 나머지는 본인 태스크만
-      const canEdit = (r) => !currentUser || currentUser === 'CS' || r.owner === currentUser;
+      const canEdit = (r) => currentUser === 'CS' || r.owner === currentUser;
       const [detailId, setDetailId] = useState(null);
       const headerH = 56;
       const totalRowsHeight = rows.length * rowH;
