@@ -3241,8 +3241,7 @@ body {
                 <button onClick={toggleAll} style={groupBtnStyle(allState)}
                   onMouseEnter={(e) => { if (allState === "none") e.currentTarget.style.background = "var(--paper-3)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = allState !== "none" ? "rgba(138,58,31,0.10)" : "transparent"; }}>
-                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: allState !== "none" ? "var(--accent)" : "var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "var(--paper)", flexShrink: 0 }}>ALL</span>
-                  <span>전체</span>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: allState !== "none" ? "var(--accent)" : "transparent", border: allState === "none" ? "1.5px solid var(--line-2)" : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: allState !== "none" ? "var(--paper)" : "var(--ink-3)", flexShrink: 0 }}>ALL</span>
                   {allState === "all" && <span style={{ marginLeft: "auto" }}>✓</span>}
                   {allState === "some" && <span style={{ marginLeft: "auto", opacity: 0.5 }}>—</span>}
                 </button>
@@ -3256,11 +3255,9 @@ body {
                       <button onClick={() => toggleTeam(team)} style={groupBtnStyle(ts)}
                         onMouseEnter={(e) => { if (ts === "none") e.currentTarget.style.background = "var(--paper-3)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = ts !== "none" ? "rgba(138,58,31,0.10)" : "transparent"; }}>
-                        <span style={{ width: 22, height: 14, borderRadius: 2, background: ts !== "none" ? "var(--accent)" : "var(--line)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: "var(--paper)", flexShrink: 0 }}>{team.name}</span>
-                        <span>{team.name}</span>
-                        <span className="mono" style={{ marginLeft: "auto", fontSize: 9, opacity: 0.5 }}>{team.members.filter(m => ctxOwners[m]).length}</span>
-                        {ts === "all" && <span>✓</span>}
-                        {ts === "some" && <span style={{ opacity: 0.5 }}>—</span>}
+                        <span style={{ padding: "0 5px", height: 14, borderRadius: 2, background: ts !== "none" ? "var(--accent)" : "transparent", border: ts === "none" ? "1px solid var(--line-2)" : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 700, color: ts !== "none" ? "var(--paper)" : "var(--ink-3)", flexShrink: 0, letterSpacing: "0.04em", textTransform: "uppercase" }}>{team.name}</span>
+                        {ts === "all" && <span style={{ marginLeft: "auto" }}>✓</span>}
+                        {ts === "some" && <span style={{ marginLeft: "auto", opacity: 0.5 }}>—</span>}
                       </button>
                       {team.members.map((k) => {
                         const o2 = ctxOwners[k];
