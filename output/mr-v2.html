@@ -613,7 +613,7 @@
         today: null,  // null이면 실제 오늘 날짜 사용
 
         // ── 저장소 키 (프로젝트마다 고유하게) ─────────────────────────
-        storageKey: "project-gantt-v1",
+        storageKey: "mr-v2-gantt-state-v1",
 
         // ── 팀 ────────────────────────────────────────────────────────
         teams: [
@@ -634,9 +634,9 @@
 
         // ── 루트 모듈 (WBS 1단계 항목 색상) ───────────────────────────
         roots: {
-          "1": { name: "Module A", color: "var(--slate)"  },
-          "2": { name: "Module B", color: "var(--clay)"   },
-          "3": { name: "Module C", color: "var(--accent)" },
+          "1": { name: "Module A", color: "#46555f" },
+          "2": { name: "Module B", color: "#c89a6e" },
+          "3": { name: "Module C", color: "#8a3a1f" },
         },
 
         // ── WBS 초기 데이터 ────────────────────────────────────────────
@@ -771,10 +771,20 @@
       return end + 1;
     }
 
-    // Color & name for a top-level WBS code, with a fallback for ad-hoc tasks (codes beyond the predefined roots).
-    const FALLBACK_ROOT = { name: "Custom task", color: "var(--ink-3)" };
+    // Color & name for a top-level WBS code. Cycles through a 16-color palette for roots not in ROOTS config.
+    const ROOT_PALETTE = [
+      "#46555f", "#8a3a1f", "#c89a6e",
+      "#2e7d5c", "#1a5fa8", "#7b4fa0",
+      "#c94c6a", "#8b7014", "#2d7a8a",
+      "#a05928", "#4a6b3a", "#5a3a6b",
+      "#6b4a2a", "#2a5a6b", "#8b3a5a",
+      "#3a6b5a",
+    ];
     function rootInfo(code) {
-      return ROOTS[code.split(".")[0]] || FALLBACK_ROOT;
+      const key = code ? code.split(".")[0] : "";
+      if (ROOTS[key]) return ROOTS[key];
+      const idx = Math.max(0, (parseInt(key, 10) || 1) - 1);
+      return { name: "Custom task", color: ROOT_PALETTE[idx % ROOT_PALETTE.length] };
     }
 
     // ====================================================================
@@ -1021,13 +1031,19 @@
       // ── Auto-save to local save server ───────────────────────────────────
       const SAVE_FILENAME = STORAGE_KEY + '.json';
       const [saveStatus, setSaveStatus] = useState('idle'); // 'idle'|'dirty'|'saving'|'saved'|'error'
+      const [lastSavedAt, setLastSavedAt] = useState(null);
       const [isDirty, setIsDirty] = useState(false);
       const [serverOnline, setServerOnline] = useState(false);
       const isHTTP = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+      const isLocal = isHTTP && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const isGitHubPages = isHTTP && !isLocal && window.location.hostname.endsWith('.github.io');
+      // owner/repo auto-derived from GitHub Pages URL: https://{owner}.github.io/{repo}/...
+      const ghOwner = isGitHubPages ? window.location.hostname.replace('.github.io', '') : null;
+      const ghRepo  = isGitHubPages ? window.location.pathname.split('/').filter(Boolean)[0] : null;
 
       // 서버 생존 확인 (5초마다)
       useEffect(() => {
-        if (!isHTTP) return;
+        if (!isLocal) return;
         const check = () =>
           fetch('/ping').then((r) => setServerOnline(r.ok)).catch(() => setServerOnline(false));
         check();
@@ -1038,24 +1054,35 @@
       // On mount: try to load server save file (may be newer than localStorage, e.g. different browser)
       useEffect(() => {
         if (!isHTTP) return; // file:// 프로토콜에서는 skip
-        fetch('/' + SAVE_FILENAME)
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => {
-            if (!data || !data.items) return;
-            const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
-            const localRaw = localStorage.getItem(STORAGE_KEY);
-            const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
-            if (serverTime >= localTime) {
-              const restored = deserializeItems(data.items);
-              if (restored) {
-                setItems(restored);
-                if (data.collapsed) setCollapsed(data.collapsed);
-                if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
-                setSaveStatus('saved');
+        // Check if a real save server exists (Claude Code web env).
+        // Local python http.server has no /ping, so hasServer=false.
+        // When no save server, always prefer JSON (git pull is the source of truth).
+        const hasSaveServer = fetch('/ping').then((r) => r.ok).catch(() => false);
+        hasSaveServer.then((hasServer) => {
+          fetch('./' + SAVE_FILENAME)
+            .then((r) => r.ok ? r.json() : null)
+            .then((data) => {
+              if (!data || !data.items) return;
+              const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
+              const localRaw = localStorage.getItem(STORAGE_KEY);
+              const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
+              // No save server = local mode: JSON from git is ground truth, ignore localStorage timestamp
+              if (!hasServer || serverTime >= localTime) {
+                const restored = deserializeItems(data.items);
+                if (restored) {
+                  setItems(restored);
+                  if (data.collapsed) setCollapsed(data.collapsed);
+                  if (data.meta) setMetaState((m) => ({ ...m, ...data.meta }));
+                  if (data.owners) setOwners(data.owners);
+                  if (data.teams) setTeams(data.teams);
+                  if (data.vendors) setVendors(data.vendors);
+                  setSaveStatus('saved');
+                  if (data.savedAt) setLastSavedAt(new Date(data.savedAt));
+                }
               }
-            }
-          })
-          .catch(() => { /* server not running — 그냥 localStorage 사용 */ });
+            })
+            .catch(() => { /* JSON 파일 없음 — localStorage 사용 */ });
+        });
       }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
       // 변경 감지 → dirty 표시
@@ -1066,9 +1093,44 @@
         setSaveStatus('dirty');
       }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
 
+      // GitHub API로 직접 커밋 (GitHub Pages 환경용)
+      const saveToGitHub = useCallback(async (payload) => {
+        const PAT_KEY = '__gh_pat__';
+        let token = localStorage.getItem(PAT_KEY);
+        if (!token) {
+          token = window.prompt(
+            'GitHub Personal Access Token을 입력하세요.\n' +
+            '(repo write 권한 필요 — 한 번만 입력하면 저장됩니다)'
+          );
+          if (!token) { setSaveStatus('error'); return; }
+          localStorage.setItem(PAT_KEY, token.trim());
+          token = token.trim();
+        }
+        const apiPath = `https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/output/${SAVE_FILENAME}`;
+        const headers = { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+        setSaveStatus('saving');
+        try {
+          const getRes = await fetch(apiPath, { headers });
+          if (getRes.status === 401) {
+            localStorage.removeItem(PAT_KEY);
+            setSaveStatus('error');
+            alert('토큰이 유효하지 않습니다. 다시 시도해주세요.');
+            return;
+          }
+          const fileInfo = getRes.ok ? await getRes.json() : null;
+          const content = btoa(unescape(encodeURIComponent(payload)));
+          const ts = new Date().toISOString().slice(0, 16).replace('T', ' ');
+          const body = { message: `Save ${ts}`, content };
+          if (fileInfo && fileInfo.sha) body.sha = fileInfo.sha;
+          const putRes = await fetch(apiPath, { method: 'PUT', headers, body: JSON.stringify(body) });
+          if (putRes.ok) { setSaveStatus('saved'); setIsDirty(false); setLastSavedAt(new Date()); }
+          else { setSaveStatus('error'); console.error('[GH Save]', await putRes.text()); }
+        } catch (err) { setSaveStatus('error'); console.error('[GH Save]', err); }
+      }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
+
       // 수동 저장
       const saveToServer = useCallback(() => {
-        if (!isHTTP) return;
+        if (!isLocal && !isGitHubPages) return;
         let payload;
         try {
           payload = JSON.stringify({
@@ -1086,6 +1148,7 @@
           setSaveStatus('error');
           return;
         }
+        if (isGitHubPages) { saveToGitHub(payload); return; }
         setSaveStatus('saving');
         fetch('/ping')
           .then((r) => {
@@ -1097,7 +1160,7 @@
             });
           })
           .then((r) => {
-            if (r.ok) { setSaveStatus('saved'); setIsDirty(false); }
+            if (r.ok) { setSaveStatus('saved'); setIsDirty(false); setLastSavedAt(new Date()); }
             else { console.error('[Save] server returned', r.status); setSaveStatus('error'); }
           })
           .catch((err) => {
@@ -1105,7 +1168,7 @@
               '— 서버 창(Gantt Server)에서 에러 로그를 확인하세요.');
             setSaveStatus('error');
           });
-      }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
+      }, [items, collapsed, meta, owners, teams, vendors, saveToGitHub]); // eslint-disable-line react-hooks/exhaustive-deps
 
       // Export current state as a JSON file the user can keep. owners, teams, vendors 정보도 함께 저장하도록 수정. (기존 export 기능은 유지)
       const exportJSON = useCallback(() => downloadJSON(items, collapsed, meta, owners, teams, vendors), [items, collapsed, meta, owners, teams, vendors]);
@@ -1170,7 +1233,7 @@
         // 1) ownership pass
         let keepIds = new Set(enriched.map((r) => r.id));
         if (v.owner !== "all") {
-          const team = TEAMS.find((t) => t.id === v.owner);
+          const team = teams.find((t) => t.id === v.owner);
           const matchOwner = team
             ? (r) => (r.owners || []).some((o) => team.members.includes(o))
             : (r) => (r.owners || []).includes(v.owner);
@@ -1203,7 +1266,7 @@
           if (r.isSummary && collapsed[r.id]) collapseAtLevel = r.level;
         });
         return out;
-      }, [enriched, v.owner, collapsed]);
+      }, [enriched, v.owner, collapsed, teams]);
 
       const rowIndex = useMemo(() => {
         const m = {};
@@ -1434,6 +1497,7 @@
       // ------- dep drag -------
       const [depDrag, setDepDrag] = useState(null); // {fromId, fromX, fromY, x, y, hitId}
       const scrollWrapRef = useRef(null);
+      const headerScrollRef = useRef(null);
 
       const startDepDrag = useCallback((e, row) => {
         e.stopPropagation();
@@ -1449,7 +1513,7 @@
           const rect = wrap.getBoundingClientRect();
           return {
             x: ev.clientX - rect.left + wrap.scrollLeft,
-            y: ev.clientY - rect.top - 56 // 56 = headerH
+            y: ev.clientY - rect.top
           };
         }
         function onMove(ev) {
@@ -1490,7 +1554,9 @@
         e.preventDefault();
         document.body.style.cursor = "grabbing";
         function onMove(ev) {
-          wrap.scrollLeft = startScroll - (ev.clientX - startX);
+          const next = startScroll - (ev.clientX - startX);
+          wrap.scrollLeft = next;
+          if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
         }
         function onUp() {
           window.removeEventListener("mousemove", onMove);
@@ -1623,16 +1689,22 @@
         return map;
       }, [enriched]);
 
+      const allOwners = useMemo(() => ({ ...owners, ...vendors }), [owners, vendors]);
+      const allTeams = useMemo(() => {
+        const vKeys = Object.keys(vendors);
+        if (vKeys.length === 0) return teams;
+        return [...teams, { id: "VENDOR_TEAM", name: "Vendor", members: vKeys }];
+      }, [teams, vendors]);
+
       return (
-        <OwnersCtx.Provider value={{ owners, teams, ownerTaskCounts, totalLeaves: stats.total }}>
+        <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
               borderRadius: 4,
-              overflow: "hidden",
               boxShadow: "0 1px 0 rgba(28,25,22,0.04), 0 24px 60px -40px rgba(28,25,22,0.18)"
             }}>
               <GanttGrid
@@ -1661,6 +1733,7 @@
                 depDrag={depDrag}
                 rowDrag={rowDrag}
                 scrollWrapRef={scrollWrapRef}
+                headerScrollRef={headerScrollRef}
                 removeDep={removeDep}
                 selectedDep={selectedDep}
                 setSelectedDep={setSelectedDep}
@@ -1849,9 +1922,9 @@
 
     }
 
-    function SaveIndicator({ status, onSave, isHTTP, serverOnline }) {
+    function SaveIndicator({ status, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt }) {
       const isDirty = status === 'dirty';
-      const offline = isHTTP && !serverOnline;
+      const offline = isLocal && !serverOnline;
       const dot =
         offline ? "#6b7280" :
           status === 'saved' ? "#22c55e" :
@@ -1871,12 +1944,15 @@
           <span style={{
             display: "flex", alignItems: "center", gap: 5,
             fontFamily: "IBM Plex Mono, monospace", fontSize: 10.5, letterSpacing: "0.06em",
-            color: "var(--ink-3)"
-          }}>
+            color: "var(--ink-3)",
+            cursor: lastSavedAt ? "default" : undefined,
+          }}
+            title={lastSavedAt ? lastSavedAt.toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : undefined}
+          >
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, transition: "background 400ms", flexShrink: 0 }} />
             {label}
           </span>
-          {isHTTP && !offline && (
+          {(isLocal || isGitHubPages) && !offline && (
             <button onClick={onSave} disabled={!isDirty || status === 'saving'} style={{
               padding: "2px 10px", borderRadius: 3,
               border: `1px solid ${isDirty ? "var(--accent)" : "var(--line-2)"}`,
@@ -1899,7 +1975,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, serverOnline, onTeam, onVendor }) { // onVendor 추가
+    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor }) {
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -1910,7 +1986,7 @@
           <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
           <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-            {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} serverOnline={serverOnline} />}
+            {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} />}
             <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
             <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
             {isAdmin && <>
@@ -2125,7 +2201,7 @@
         hover, setHover, focusId, setFocusId,
         collapsed, toggleCollapsed,
         startBarDrag, startDepDrag, startRowDrag, startPan,
-        dragPreview, depDrag, rowDrag, scrollWrapRef,
+        dragPreview, depDrag, rowDrag, scrollWrapRef, headerScrollRef,
         removeDep, selectedDep, setSelectedDep, depMenu, setDepMenu, addNewTask, updateItem, deleteItem,
         setPendingDelete, setCtxMenu, deleteSegment
       } = props;
@@ -2159,7 +2235,9 @@
 
       useEffect(() => {
         if (scrollWrapRef.current) {
-          scrollWrapRef.current.scrollLeft = Math.max(0, todayX - 360);
+          const sx = Math.max(0, todayX - 360);
+          scrollWrapRef.current.scrollLeft = sx;
+          if (headerScrollRef.current) headerScrollRef.current.scrollLeft = sx;
         }
       }, [todayX, scrollWrapRef]);
 
@@ -2174,7 +2252,7 @@
         <div style={{ display: "grid", gridTemplateColumns: `${leftW}px 1fr`, position: "relative" }}>
           {/* LEFT */}
           <div style={{ borderRight: "1px solid var(--line)", background: "var(--paper-2)" }}>
-            <div style={{ height: headerH, borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", padding: "0 12px", gap: 6 }}>
+            <div style={{ height: headerH, borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", padding: "0 12px", gap: 6, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
               <span style={{ width: 14 }} />
               <span style={{ width: 14 }} />
               <span className="mono small-caps" style={{ color: "var(--ink-3)", minWidth: 36, paddingLeft: 8 }}>WBS</span>
@@ -2201,8 +2279,9 @@
                     }}
                     style={{
                       height: rowH, display: "flex", alignItems: "center", gap: 6,
-                      padding: `0 12px 0 ${10 + indent}px`,
+                      padding: `0 12px 0 ${7 + indent}px`,
                       borderBottom: "1px solid var(--line)",
+                      borderLeft: `3px solid ${rootColor}`,
                       background: isFocus ? "var(--paper-3)" :
                         isHover ? "rgba(232,221,198,0.5)" :
                           lvl === 1 ? "var(--paper-3)" :
@@ -2237,16 +2316,16 @@
                     <span className="mono"
                       onClick={(e) => { e.stopPropagation(); setDetailId(r.id); }}
                       style={{
-                        fontSize: lvl === 1 ? 13 : lvl === 2 ? 11 : 10.5,
-                        color: lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)",
-                        fontWeight: lvl <= 2 ? 600 : 400,
+                        fontSize: lvl === 1 ? 12 : lvl === 2 ? 10.5 : 10,
+                        color: rootColor,
+                        fontWeight: 700,
                         minWidth: 36, letterSpacing: 0.3,
-                        borderLeft: `2px solid ${rootColor}`,
-                        paddingLeft: 6,
+                        padding: "2px 6px",
                         cursor: "pointer",
+                        flexShrink: 0,
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
-                      onMouseLeave={(e) => e.currentTarget.style.color = lvl <= 2 ? "var(--ink-2)" : "var(--ink-4)"}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = "0.7"}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
                     >{r.code}</span>
 
                     <div
@@ -2295,9 +2374,9 @@
                           width: 16, height: 16,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           borderRadius: 2, border: "1px solid var(--line-2)",
-                          color: "var(--accent)", fontSize: 13, cursor: "pointer",
-                          fontFamily: "IBM Plex Mono, monospace", lineHeight: 1,
-                          background: "var(--paper-2)",
+                          color: "var(--accent)", fontSize: 12, cursor: "pointer",
+                          fontFamily: "IBM Plex Mono, monospace", lineHeight: "16px",
+                          background: "var(--paper-2)", userSelect: "none",
                         }}>+</span>
                       <span
                         onClick={(e) => {
@@ -2309,8 +2388,8 @@
                           width: 16, height: 16,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           borderRadius: 2, border: "1px solid var(--line-2)",
-                          color: "var(--ink-3)", fontSize: 11, cursor: "pointer",
-                          lineHeight: 1, background: "var(--paper-2)",
+                          color: "var(--ink-3)", fontSize: 10, cursor: "pointer",
+                          lineHeight: "16px", background: "var(--paper-2)", userSelect: "none",
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.color = "#c44b3d"; e.currentTarget.style.borderColor = "#c44b3d"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ink-3)"; e.currentTarget.style.borderColor = "var(--line-2)"; }}
@@ -2361,11 +2440,12 @@
             </div>
           </div>
 
-          {/* RIGHT — scrollable */}
-          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "hidden", position: "relative" }}>
+          {/* RIGHT — header + scrollable body */}
+          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* HEADER — sticky, 가로 스크롤은 JS로 동기화 */}
+          <div ref={headerScrollRef} style={{ overflowX: "hidden", overflowY: "clip", flexShrink: 0, position: "sticky", top: 0, zIndex: 20, background: "var(--paper-2)" }}>
             <div style={{ width: timelineW, position: "relative" }}>
-              {/* HEADER */}
-              <div style={{ height: headerH, borderBottom: "1px solid var(--line)", position: "relative" }}>
+              <div style={{ height: headerH, borderBottom: "1px solid var(--line)" }}>
                 <div style={{ position: "absolute", inset: 0, height: 24, borderBottom: "1px solid var(--line)" }}>
                   {months.map((m, idx) => {
                     const next = months[idx + 1];
@@ -2391,7 +2471,7 @@
                       return (
                         <div key={idx} style={{
                           position: "absolute", left: w.i * dayW, width: wpx, height: "100%",
-                          borderRight: "1px dashed var(--line-2)",
+                          borderRight: "1px solid var(--line-2)",
                           display: "flex", alignItems: "center", paddingLeft: 3, overflow: "hidden"
                         }}>
                           {wpx >= 18 && <span className="mono" style={{ fontSize: 8, color: "var(--ink-4)", letterSpacing: 0.2, whiteSpace: "nowrap" }}>W{w.w}</span>}
@@ -2421,7 +2501,12 @@
                   }
                 </div>
               </div>
-
+            </div>
+          </div>
+          {/* BODY — 가로 스크롤 컨테이너 */}
+          <div ref={scrollWrapRef} style={{ overflowX: "auto", overflowY: "clip", position: "relative" }}
+            onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
+            <div style={{ width: timelineW, position: "relative" }}>
               {/* BODY (pan capture surface) */}
               <div
                 onMouseDown={startPan}
@@ -2429,11 +2514,12 @@
 
                 {/* grid lines + 주말 배경 — zoom에 맞춰 */}
                 {zoomLevel === "month12" ? (
-                  /* month12: 월 경계선 */
-                  months.map((m, idx) =>
-                    <div key={idx} style={{
-                      position: "absolute", top: 0, left: m.i * dayW, width: 1, height: totalRowsHeight,
-                      background: "var(--line)", pointerEvents: "none"
+                  /* month12: 주 경계 점선만 */
+                  weeks.map((w, idx) =>
+                    <div key={`w${idx}`} style={{
+                      position: "absolute", top: 0, left: w.i * dayW, width: 1, height: totalRowsHeight,
+                      backgroundImage: "repeating-linear-gradient(to bottom, var(--line-2) 0, var(--line-2) 3px, transparent 3px, transparent 6px)",
+                      pointerEvents: "none"
                     }} />
                   )
                 ) : (
@@ -2465,16 +2551,21 @@
                 {/* row tinting + separators */}
                 {rows.map((r, i) => {
                   const lvl = r.level;
-                  const bg = r.isSummary && lvl === 1 ? "var(--paper-3)" :
-                    r.isSummary && lvl === 2 ? "rgba(232,221,198,0.35)" : "transparent";
+                  const rowColor = colorFor(r.code);
+                  const levelBg = r.isSummary && lvl === 1 ? "var(--paper-3)" :
+                    r.isSummary && lvl === 2 ? "rgba(232,221,198,0.35)" : null;
                   return (
                     <React.Fragment key={r.id}>
-                      {bg !== "transparent" &&
+                      {levelBg &&
                         <div style={{
                           position: "absolute", top: i * rowH, left: 0, right: 0, height: rowH,
-                          background: bg, pointerEvents: "none"
+                          background: levelBg, pointerEvents: "none"
                         }} />
                       }
+                      <div style={{
+                        position: "absolute", top: i * rowH, left: 0, right: 0, height: rowH,
+                        background: rowColor + "0c", pointerEvents: "none"
+                      }} />
                       <div style={{
                         position: "absolute", left: 0, right: 0, top: (i + 1) * rowH - 1,
                         height: 1, background: "var(--line)", pointerEvents: "none"
@@ -2609,7 +2700,7 @@
                 {/* TODAY */}
                 <div style={{
                   position: "absolute", top: 0, left: todayX, width: 1, height: totalRowsHeight,
-                  background: "var(--accent)", pointerEvents: "none"
+                  background: "var(--accent)", pointerEvents: "none", zIndex: 25
                 }}>
                   <div style={{
                     position: "absolute", top: -6, left: -4, width: 9, height: 9,
@@ -2698,6 +2789,7 @@
                 })}
               </div>
             </div>
+          </div>
           </div>
           {detailId && (() => {
             const detailItem = rows.find((r) => r.id === detailId);
@@ -3056,7 +3148,8 @@
         setOpen((x) => !x);
       };
 
-      const allMembers = ctxTeams.flatMap((t) => t.members).filter((m) => ctxOwners[m]);
+      const internalTeams = ctxTeams.filter((t) => t.id !== "VENDOR_TEAM");
+      const allMembers = internalTeams.flatMap((t) => t.members).filter((m) => ctxOwners[m]);
 
       const toggle = (id) => {
         if (values.includes(id)) onChange(values.filter((x) => x !== id));
@@ -3092,7 +3185,7 @@
         if (allMembers.length > 0 && values.length === allMembers.length && allMembers.every((m) => values.includes(m))) return "ALL";
         for (const t of ctxTeams) {
           const valid = t.members.filter((m) => ctxOwners[m]);
-          if (valid.length > 0 && valid.length === values.length && valid.every((m) => values.includes(m))) return t.name;
+          if (valid.length > 1 && valid.length === values.length && valid.every((m) => values.includes(m))) return t.name;
         }
         return null;
       })();
@@ -3240,10 +3333,16 @@
             }}>
 
             {/* Header */}
-            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <span className="mono" style={{ fontSize: 12, color: rootColor, fontWeight: 700, letterSpacing: 0.4, paddingTop: 4, flexShrink: 0 }}>{item.code}</span>
-              <span className="serif" style={{ fontSize: 20, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.25 }}>{item.name}</span>
-              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 16, padding: 4, flexShrink: 0, lineHeight: 1 }}>✕</button>
+            <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span className="mono" style={{ fontSize: 11, color: rootColor, fontWeight: 700, letterSpacing: 0.5,
+                  background: rootColor + "18", padding: "2px 7px", borderRadius: 3, flexShrink: 0 }}>{item.code}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ width: 3, borderRadius: 2, background: rootColor, alignSelf: "stretch", flexShrink: 0, marginTop: 2 }} />
+                <span className="serif" style={{ fontSize: 20, flex: 1, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.25 }}>{item.name}</span>
+                <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", fontSize: 16, padding: 4, flexShrink: 0, lineHeight: 1 }}>✕</button>
+              </div>
             </div>
 
             {/* Info grid */}
