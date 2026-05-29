@@ -1034,12 +1034,12 @@
       const [lastSavedAt, setLastSavedAt] = useState(null);
       const [isDirty, setIsDirty] = useState(false);
       const [serverOnline, setServerOnline] = useState(false);
-      const isHTTP = (window.location.protocol === 'http:' || window.location.protocol === 'https:') &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const isHTTP = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+      const isLocal = isHTTP && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
       // 서버 생존 확인 (5초마다)
       useEffect(() => {
-        if (!isHTTP) return;
+        if (!isLocal) return;
         const check = () =>
           fetch('/ping').then((r) => setServerOnline(r.ok)).catch(() => setServerOnline(false));
         check();
@@ -1091,7 +1091,7 @@
 
       // 수동 저장
       const saveToServer = useCallback(() => {
-        if (!isHTTP) return;
+        if (!isLocal) return;
         let payload;
         try {
           payload = JSON.stringify({
@@ -1660,7 +1660,7 @@
         <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -1882,9 +1882,9 @@
 
     }
 
-    function SaveIndicator({ status, onSave, isHTTP, serverOnline, lastSavedAt }) {
+    function SaveIndicator({ status, onSave, isHTTP, isLocal, serverOnline, lastSavedAt }) {
       const isDirty = status === 'dirty';
-      const offline = isHTTP && !serverOnline;
+      const offline = isLocal && !serverOnline;
       const dot =
         offline ? "#6b7280" :
           status === 'saved' ? "#22c55e" :
@@ -1935,7 +1935,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, serverOnline, lastSavedAt, onTeam, onVendor }) {
+    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, isLocal, serverOnline, lastSavedAt, onTeam, onVendor }) {
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -1946,7 +1946,7 @@
           <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
           <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-            {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} serverOnline={serverOnline} lastSavedAt={lastSavedAt} />}
+            {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} isLocal={isLocal} serverOnline={serverOnline} lastSavedAt={lastSavedAt} />}
             <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
             <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
             {isAdmin && <>
