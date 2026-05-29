@@ -100,7 +100,22 @@ def _do_push(filename):
         if push.returncode == 0:
             _log(f'  ^  GitHub push OK  {ts}')
         else:
-            _log(f'  !  push failed: {push.stderr.strip()}')
+            _log(f'  ~  push 실패, pull --rebase 후 재시도...')
+            pull = _run(
+                ['git', '-C', REPO_ROOT, 'pull', '--rebase', 'origin', branch],
+                capture_output=True, text=True, timeout=60,
+            )
+            if pull.returncode != 0:
+                _log(f'  !  rebase 실패: {pull.stderr.strip()}')
+                return
+            push2 = _run(
+                ['git', '-C', REPO_ROOT, 'push', '--set-upstream', 'origin', branch],
+                capture_output=True, text=True, timeout=60,
+            )
+            if push2.returncode == 0:
+                _log(f'  ^  GitHub push OK (rebase 후)  {ts}')
+            else:
+                _log(f'  !  push 최종 실패: {push2.stderr.strip()}')
 
     except subprocess.TimeoutExpired:
         _log('  !  Git timeout')
