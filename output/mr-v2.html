@@ -2310,9 +2310,9 @@
                       title="Drag to reorder"
                       className="mono"
                       style={{
-                        width: 14, fontSize: 11, color: "var(--ink-4)",
+                        width: 14, fontSize: 13, color: "var(--ink-2)",
                         cursor: "grab", userSelect: "none", textAlign: "center",
-                        opacity: isHover ? 1 : 0.45, lineHeight: 1
+                        opacity: isHover ? 0.85 : 0.2, lineHeight: 1
                       }}>⋮⋮</span>
 
                     {/* collapse chevron for summaries */}
@@ -2320,9 +2320,10 @@
                       <span
                         onClick={(e) => { e.stopPropagation(); toggleCollapsed(r.id); }}
                         style={{
-                          cursor: "pointer", width: 14, fontSize: 10, color: "var(--ink-2)",
+                          cursor: "pointer", width: 14, fontSize: 14, color: "var(--ink-2)",
                           transform: isCollapsed ? "rotate(-90deg)" : "rotate(0)",
-                          transition: "transform 140ms ease", lineHeight: 1, userSelect: "none"
+                          transition: "transform 140ms ease", lineHeight: 1, userSelect: "none",
+                          display: "flex", alignItems: "center", justifyContent: "center"
                         }}>▾</span> :
 
                       <span style={{ width: 14 }} />
