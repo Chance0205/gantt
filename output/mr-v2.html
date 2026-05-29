@@ -3182,17 +3182,34 @@
       );
     }
 
-    // 단일 담당자 피커 (WBS 행 인라인용)
+    // 단일 담당자 피커 (OwnersPicker 스타일, 단일 선택)
     function OwnerSinglePicker({ value, onChange, hasCollabs }) {
-      const { owners: ctxOwners } = React.useContext(OwnersCtx);
+      const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
       const [open, setOpen] = useState(false);
+      const [dropPos, setDropPos] = useState(null);
+      const triggerRef = React.useRef(null);
       const o = value ? ctxOwners[value] : null;
       const tint = o?.tint || "var(--ink-4)";
 
+      const handleOpen = (e) => {
+        e.stopPropagation();
+        if (!onChange) return;
+        if (!open && triggerRef.current) {
+          const rect = triggerRef.current.getBoundingClientRect();
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const right = window.innerWidth - rect.right;
+          setDropPos(spaceBelow < 280
+            ? { bottom: window.innerHeight - rect.top + 4, right }
+            : { top: rect.bottom + 4, right }
+          );
+        }
+        setOpen(x => !x);
+      };
+
       return (
-        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 3 }}>
+        <span ref={triggerRef} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 3 }}>
           <span
-            onClick={(e) => { e.stopPropagation(); if (onChange) setOpen((x) => !x); }}
+            onClick={handleOpen}
             title={o ? o.name : "담당자 없음"}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -3206,34 +3223,68 @@
             {value || "—"}
           </span>
           {open && onChange && (
-            <div onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute", top: "100%", left: 0, zIndex: 200,
-                background: "var(--paper-2)", border: "1px solid var(--line)",
-                borderRadius: 4, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.25)",
-                minWidth: 130, padding: 4,
-              }}>
-              <div
-                onClick={() => { onChange(null); setOpen(false); }}
-                style={{ padding: "5px 10px", cursor: "pointer", fontSize: 12, color: "var(--ink-3)", borderRadius: 3 }}>
-                — 없음
-              </div>
-              {Object.entries(ctxOwners).map(([id, ow]) => (
-                <div key={id}
-                  onClick={() => { onChange(id); setOpen(false); }}
+            <React.Fragment>
+              <div onMouseDown={(e) => { e.stopPropagation(); setOpen(false); }}
+                onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+              <div onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "fixed", ...dropPos,
+                  background: "var(--paper-2)", border: "1px solid var(--line)",
+                  borderRadius: 4, boxShadow: "0 12px 30px -8px rgba(0,0,0,0.25)",
+                  zIndex: 200, padding: 4, minWidth: 210, maxHeight: 320, overflowY: "auto",
+                }}>
+                <button
+                  onClick={() => { onChange(null); setOpen(false); }}
                   style={{
-                    padding: "5px 10px", cursor: "pointer", fontSize: 12,
-                    color: id === value ? "var(--paper)" : "var(--ink)",
-                    background: id === value ? (ow.tint || "var(--ink)") : "transparent",
-                    borderRadius: 3, display: "flex", alignItems: "center", gap: 6,
-                  }}>
-                  <span className="mono" style={{ fontWeight: 600, fontSize: 10 }}>{id}</span>
-                  {ow.name}
-                </div>
-              ))}
-            </div>
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "4px 8px", border: "none",
+                    background: !value ? "rgba(138,58,31,0.10)" : "transparent",
+                    color: "var(--ink-3)", fontFamily: "inherit", fontSize: 12,
+                    cursor: "pointer", borderRadius: 2, textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => { if (value) e.currentTarget.style.background = "var(--paper-3)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = !value ? "rgba(138,58,31,0.10)" : "transparent"; }}>
+                  <span style={{ width: 22, height: 22, borderRadius: 99, border: "1.5px dashed var(--ink-4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--ink-4)" }}>—</span>
+                  <span>없음</span>
+                  {!value && <span style={{ marginLeft: "auto", color: "var(--accent)" }}>✓</span>}
+                </button>
+                <div style={{ height: 1, background: "var(--line)", margin: "4px 4px" }} />
+                {ctxTeams.map((team) => {
+                  const members = team.members.filter(m => ctxOwners[m]);
+                  if (!members.length) return null;
+                  return (
+                    <React.Fragment key={team.id}>
+                      <div style={{ padding: "4px 8px 2px", display: "flex", alignItems: "center" }}>
+                        <span style={{ padding: "0 5px", height: 14, borderRadius: 2, background: "transparent", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", fontSize: 8, fontWeight: 700, color: "var(--ink-3)", letterSpacing: "0.04em", textTransform: "uppercase" }}>{team.name}</span>
+                      </div>
+                      {members.map((k) => {
+                        const o2 = ctxOwners[k];
+                        const active = value === k;
+                        return (
+                          <button key={k} onClick={() => { onChange(active ? null : k); setOpen(false); }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 8, width: "100%",
+                              padding: "4px 8px 4px 22px", border: "none",
+                              background: active ? "rgba(138,58,31,0.10)" : "transparent",
+                              color: "var(--ink-2)", fontFamily: "inherit", fontSize: 12,
+                              cursor: "pointer", borderRadius: 2, textAlign: "left",
+                            }}
+                            onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--paper-3)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = active ? "rgba(138,58,31,0.10)" : "transparent"; }}>
+                            <Avatar owner={o2} initials={k} />
+                            <span>{o2.name}</span>
+                            <span className="mono" style={{ marginLeft: "auto", color: "var(--ink-4)", fontSize: 10 }}>{o2.role}</span>
+                            {active && <span style={{ color: "var(--accent)", fontSize: 11, lineHeight: 1 }}>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </React.Fragment>
           )}
-          {open && <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setOpen(false)} />}
         </span>
       );
     }
