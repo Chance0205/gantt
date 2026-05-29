@@ -1077,8 +1077,10 @@
               const serverTime = data.savedAt ? new Date(data.savedAt).getTime() : 0;
               const localRaw = localStorage.getItem(STORAGE_KEY);
               const localTime = localRaw ? (() => { try { return new Date(JSON.parse(localRaw)._savedAt || 0).getTime(); } catch { return 0; } })() : 0;
-              // No save server = local mode: JSON from git is ground truth, ignore localStorage timestamp
-              if (!hasServer || serverTime >= localTime) {
+              // GitHub Pages: localStorage could be newer if a save failed → use whichever is newer
+              // Local no-server: JSON from git is ground truth
+              const shouldLoadServer = isGitHubPages ? serverTime >= localTime : (!hasServer || serverTime >= localTime);
+              if (shouldLoadServer) {
                 const restored = deserializeItems(data.items);
                 if (restored) {
                   setItems(restored);
@@ -1139,7 +1141,7 @@
               if (serverTime > myLoadTime) {
                 const serverStr = new Date(serverTime).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 const ok = window.confirm(`다른 사람이 ${serverStr}에 저장한 내용이 있습니다.\n덮어쓰면 그 변경사항이 사라집니다. 계속하시겠습니까?`);
-                if (!ok) { setSaveStatus('saved'); return; }
+                if (!ok) { setSaveStatus('dirty'); return; }
               }
             } catch { /* 디코딩 실패 시 그냥 진행 */ }
           }
@@ -1148,9 +1150,18 @@
           const ts = new Date().toISOString().slice(0, 16).replace('T', ' ');
           const body = { message: `Save ${ts}`, content };
           if (fileInfo && fileInfo.sha) body.sha = fileInfo.sha;
-          const putRes = await fetch(apiPath, { method: 'PUT', headers, body: JSON.stringify(body) });
+          let putRes = await fetch(apiPath, { method: 'PUT', headers, body: JSON.stringify(body) });
+          // SHA mismatch (422/409): 다른 커밋이 끼어든 경우 → 새 SHA로 1회 재시도
+          if (putRes.status === 422 || putRes.status === 409) {
+            const retryGet = await fetch(apiPath, { headers });
+            const retryInfo = retryGet.ok ? await retryGet.json() : null;
+            if (retryInfo?.sha) {
+              body.sha = retryInfo.sha;
+              putRes = await fetch(apiPath, { method: 'PUT', headers, body: JSON.stringify(body) });
+            }
+          }
           if (putRes.ok) { const now = new Date(); setSaveStatus('saved'); setIsDirty(false); setLastSavedAt(now); loadedSavedAt.current = now.toISOString(); }
-          else { setSaveStatus('error'); console.error('[GH Save]', await putRes.text()); }
+          else { setSaveStatus('error'); alert('저장 실패. 잠시 후 다시 시도해주세요.\n(오류: ' + putRes.status + ')'); console.error('[GH Save]', await putRes.text()); }
         } catch (err) { setSaveStatus('error'); console.error('[GH Save]', err); }
       }, [items, collapsed, meta, owners, teams, vendors]); // eslint-disable-line react-hooks/exhaustive-deps
 
