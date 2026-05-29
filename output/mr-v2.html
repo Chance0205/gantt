@@ -1700,7 +1700,7 @@
         <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} onReset={resetData} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -1975,7 +1975,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, onReset, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor }) {
+    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor }) {
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -1998,7 +1998,6 @@
               <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
               <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
               <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
-              <ToolbarBtn onClick={onReset} title="Discard changes and restore initial WBS" danger>↻ Reset</ToolbarBtn>
             </>}
           </div>
         </div>);
