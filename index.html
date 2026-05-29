@@ -2717,6 +2717,7 @@ body {
           {detailId && (() => {
             const detailItem = rows.find((r) => r.id === detailId);
             return detailItem ? <TaskDetailCard item={detailItem} rows={rows} onClose={() => setDetailId(null)}
+              canEdit={canEdit(detailItem)} isAdmin={isAdmin}
               onSave={(patch) => {
                 const { start, end, ...rest } = patch;
                 updateItem(detailId, rest);
@@ -3060,6 +3061,63 @@ body {
       );
     }
 
+    // 단일 담당자 피커 (WBS 행 인라인용)
+    function OwnerSinglePicker({ value, onChange, hasCollabs }) {
+      const { owners: ctxOwners } = React.useContext(OwnersCtx);
+      const [open, setOpen] = useState(false);
+      const o = value ? ctxOwners[value] : null;
+      const tint = o?.tint || "var(--ink-4)";
+
+      return (
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 3 }}>
+          <span
+            onClick={(e) => { e.stopPropagation(); if (onChange) setOpen((x) => !x); }}
+            title={o ? o.name : "담당자 없음"}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 20, height: 20, borderRadius: 99,
+              background: o ? tint : "var(--line)",
+              color: "var(--paper)", fontSize: 9, fontWeight: 600, letterSpacing: 0.3,
+              cursor: onChange ? "pointer" : "default",
+              border: hasCollabs ? `2px solid ${tint}` : "none",
+              boxSizing: "border-box",
+            }} className="mono">
+            {value || "—"}
+          </span>
+          {hasCollabs && <span style={{ fontSize: 8, color: "var(--ink-4)", lineHeight: 1 }}>+</span>}
+          {open && onChange && (
+            <div onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute", top: "100%", left: 0, zIndex: 200,
+                background: "var(--paper-2)", border: "1px solid var(--line)",
+                borderRadius: 4, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.25)",
+                minWidth: 130, padding: 4,
+              }}>
+              <div
+                onClick={() => { onChange(null); setOpen(false); }}
+                style={{ padding: "5px 10px", cursor: "pointer", fontSize: 12, color: "var(--ink-3)", borderRadius: 3 }}>
+                — 없음
+              </div>
+              {Object.entries(ctxOwners).map(([id, ow]) => (
+                <div key={id}
+                  onClick={() => { onChange(id); setOpen(false); }}
+                  style={{
+                    padding: "5px 10px", cursor: "pointer", fontSize: 12,
+                    color: id === value ? "var(--paper)" : "var(--ink)",
+                    background: id === value ? (ow.tint || "var(--ink)") : "transparent",
+                    borderRadius: 3, display: "flex", alignItems: "center", gap: 6,
+                  }}>
+                  <span className="mono" style={{ fontWeight: 600, fontSize: 10 }}>{id}</span>
+                  {ow.name}
+                </div>
+              ))}
+            </div>
+          )}
+          {open && <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setOpen(false)} />}
+        </span>
+      );
+    }
+
     function OwnersPicker({ values, onChange }) {
       const { owners: ctxOwners, teams: ctxTeams } = React.useContext(OwnersCtx);
       const [open, setOpen] = useState(false);
@@ -3238,7 +3296,7 @@ body {
     }
 
     // ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
-    function TaskDetailCard({ item, rows, onClose, onSave }) {
+    function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin }) {
       const toInputDate = (dt) => dt instanceof Date ? dt.toISOString().slice(0, 10) : '';
       const singleSeg = !item.isSummary && (!item.segments || item.segments.length <= 1);
 
@@ -3246,14 +3304,16 @@ body {
       const [editStart, setEditStart] = useState(toInputDate(item.start));
       const [editEnd, setEditEnd]     = useState(toInputDate(item.end));
       const [editPct, setEditPct]     = useState(item.pct ?? 0);
-      const [editOwners, setEditOwners] = useState(item.owners || []);
+      const [editOwner, setEditOwner] = useState(item.owner || null);
+      const [editCollabs, setEditCollabs] = useState(item.collaborators || []);
       const [saved, setSaved] = useState(false);
 
       const handleSave = () => {
         onSave({
           notes,
           pct: editPct,
-          owners: editOwners,
+          owner: editOwner,
+          collaborators: editCollabs,
           start: editStart ? new Date(editStart + 'T00:00:00') : item.start,
           end:   editEnd   ? new Date(editEnd   + 'T00:00:00') : item.end,
         });
@@ -3298,9 +3358,9 @@ body {
             {/* Edit fields */}
             <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "68px 1fr", rowGap: 14, columnGap: 14, alignItems: "center" }}>
 
-              {/* 기간 — 단일 세그먼트 리프만 편집 가능 */}
+              {/* 기간 — 단일 세그먼트 리프이고 canEdit인 경우만 편집 */}
               <span className="mono small-caps" style={labelStyle}>기간</span>
-              {singleSeg ? (
+              {singleSeg && canEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)}
                     style={dateInput}
@@ -3322,9 +3382,9 @@ body {
                 </span>
               )}
 
-              {/* 진행률 — 리프만 편집 가능 */}
+              {/* 진행률 — 리프이고 canEdit인 경우만 편집 */}
               <span className="mono small-caps" style={labelStyle}>진행률</span>
-              {!item.isSummary ? (
+              {!item.isSummary && canEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input type="range" min="0" max="100" step="5" value={editPct}
                     onChange={(e) => setEditPct(Number(e.target.value))}
@@ -3345,9 +3405,17 @@ body {
                 </span>
               )}
 
-              {/* 담당자 */}
+              {/* 담당자 (단일) */}
               <span className="mono small-caps" style={{ ...labelStyle, alignSelf: "flex-start", paddingTop: 6 }}>담당자</span>
-              <OwnersPicker values={editOwners} onChange={setEditOwners} />
+              {isAdmin
+                ? <OwnerSinglePicker value={editOwner} onChange={setEditOwner} hasCollabs={false} />
+                : <OwnerSinglePicker value={editOwner} onChange={null} hasCollabs={false} />}
+
+              {/* 협력자 (다중) */}
+              <span className="mono small-caps" style={{ ...labelStyle, alignSelf: "flex-start", paddingTop: 6 }}>협력자</span>
+              {canEdit
+                ? <OwnersPicker values={editCollabs} onChange={setEditCollabs} />
+                : <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{editCollabs.length > 0 ? editCollabs.join(", ") : "—"}</span>}
 
               {/* 구간 — 멀티 세그먼트 read-only */}
               {item.segments && item.segments.length > 1 && (
@@ -3406,8 +3474,9 @@ body {
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: "12px 20px", borderTop: "1px solid var(--line)" }}>
               {saved && <span className="mono" style={{ fontSize: 10.5, color: "var(--accent)", marginRight: "auto" }}>저장됨 ✓</span>}
+              {!canEdit && <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)", marginRight: "auto" }}>읽기 전용</span>}
               <button onClick={onClose} style={{ border: "1px solid var(--line-2)", padding: "6px 14px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>닫기</button>
-              <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>
+              {canEdit && <button onClick={handleSave} style={{ border: "1px solid var(--ink)", padding: "6px 14px", borderRadius: 3, background: "var(--ink)", color: "var(--paper)", fontFamily: "IBM Plex Mono, monospace", fontSize: 11, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>저장</button>}
             </div>
           </div>
         </div>
