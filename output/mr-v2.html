@@ -1534,6 +1534,7 @@
       const [depDrag, setDepDrag] = useState(null); // {fromId, fromX, fromY, x, y, hitId}
       const scrollWrapRef = useRef(null);
       const headerScrollRef = useRef(null);
+      const panMovedRef = useRef(false);
 
       const startDepDrag = useCallback((e, row) => {
         e.stopPropagation();
@@ -1587,9 +1588,11 @@
         if (!wrap) return;
         const startX = e.clientX;
         const startScroll = wrap.scrollLeft;
+        panMovedRef.current = false;
         e.preventDefault();
         document.body.style.cursor = "grabbing";
         function onMove(ev) {
+          if (Math.abs(ev.clientX - startX) > 3) panMovedRef.current = true;
           const next = startScroll - (ev.clientX - startX);
           wrap.scrollLeft = next;
           if (headerScrollRef.current) headerScrollRef.current.scrollLeft = next;
@@ -2331,7 +2334,7 @@
                       padding: `0 12px 0 ${7 + indent}px`,
                       borderBottom: "1px solid var(--line)",
                       borderLeft: `3px solid ${rootColor}`,
-                      background: isFocus ? "var(--paper-3)" :
+                      background: isFocus ? "rgba(232,221,198,0.75)" :
                         isHover ? "rgba(232,221,198,0.5)" :
                           lvl === 1 ? "var(--paper-3)" :
                             lvl === 2 ? "rgba(232,221,198,0.35)" :
@@ -2581,6 +2584,7 @@
               {/* BODY (pan capture surface) */}
               <div
                 onMouseDown={startPan}
+                onClick={() => { if (!panMovedRef.current) setFocusId(null); }}
                 style={{ position: "relative", height: totalRowsHeight, cursor: depDrag ? "crosshair" : "grab" }}>
 
                 {/* grid lines + 주말 배경 — zoom에 맞춰 */}
@@ -2840,6 +2844,7 @@
                         onDepDown={(e) => startDepDrag(e, r)}
                         onDeleteSeg={canEdit(r) ? () => deleteSegment(r.id, segIdx) : null}
                         onDoubleClick={() => setDetailId(r.id)}
+                        onClick={() => setFocusId(focusId === r.id ? null : r.id)}
                         isPreview={usePreview} />
                     );
                   });
@@ -2928,12 +2933,13 @@
 
     function LeafBar({ r, segIdx, totalSegs, isFirstSeg, isLastSeg, fillFraction,
       x, y, w, h, color, isHover, isFocus, onEnter, onLeave,
-      onBarDown, onDepDown, isPreview, previewStart, previewEnd, onDeleteSeg, onDoubleClick }) {
+      onBarDown, onDepDown, isPreview, previewStart, previewEnd, onDeleteSeg, onDoubleClick, onClick }) {
       const fillW = (w - 2) * fillFraction;
       const handleW = 6;
       return (
         <div onMouseEnter={onEnter} onMouseLeave={onLeave}
           onMouseDown={(e) => { e.stopPropagation(); onBarDown(e, "move"); }}
+          onClick={(e) => { e.stopPropagation(); onClick && onClick(); }}
           onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
           style={{
             position: "absolute", left: x, top: y, width: w, height: h,
