@@ -1107,7 +1107,7 @@
 
       // GitHub API로 직접 커밋 (GitHub Pages 환경용)
       const saveToGitHub = useCallback(async (payload) => {
-        const PAT_KEY = '__gh_pat__';
+        const PAT_KEY = '__gh_pat__' + (currentUser || '');
         let token = localStorage.getItem(PAT_KEY);
         if (!token) {
           token = window.prompt(
@@ -1737,7 +1737,8 @@
         <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
-            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)} />
+            <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} currentUser={currentUser} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)}
+              onResetPat={() => { localStorage.removeItem('__gh_pat__' + (currentUser || '')); saveToServer(); }} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -1963,7 +1964,7 @@
 
     }
 
-    function SaveIndicator({ status, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt }) {
+    function SaveIndicator({ status, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onResetPat }) {
       const isDirty = status === 'dirty';
       const offline = isLocal && !serverOnline;
       const dot =
@@ -2004,6 +2005,12 @@
               letterSpacing: "0.04em", transition: "all 200ms"
             }}>Save</button>
           )}
+          {isGitHubPages && onResetPat && (
+            <button onClick={onResetPat} title="PAT 재설정" style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 12, padding: "0 2px", color: "var(--ink-4)", lineHeight: 1
+            }}>🔑</button>
+          )}
           {offline && (
             <span style={{
               fontSize: 10, fontFamily: "IBM Plex Mono, monospace",
@@ -2016,7 +2023,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, setTweak, onExport, onImport, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor }) {
+    function Toolbar({ v, zoom, isAdmin, currentUser, setTweak, onExport, onImport, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor, onResetPat }) {
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -2027,7 +2034,7 @@
           <Seg label="Zoom" value={zoom || "month1"} options={[["month1", "Day"], ["month12", "Month"]]} onChange={(x) => setTweak("zoom", x)} />
           <OwnerFilter value={v.owner} onChange={(x) => setTweak("owner", x)} />
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
-            {isAdmin && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} />}
+            {currentUser && <SaveIndicator status={saveStatus} onSave={onSave} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onResetPat={onResetPat} />}
             <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
             <Toggle label="Dependencies" value={v.showDeps} onChange={(x) => setTweak("showDeps", x)} />
             {isAdmin && <>
