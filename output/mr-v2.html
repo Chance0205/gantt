@@ -1601,6 +1601,7 @@
           window.removeEventListener("mousemove", onMove);
           window.removeEventListener("mouseup", onUp);
           document.body.style.cursor = "";
+          if (!panMovedRef.current) setFocusId(null);
         }
         window.addEventListener("mousemove", onMove);
         window.addEventListener("mouseup", onUp);
@@ -2334,7 +2335,7 @@
                       padding: `0 12px 0 ${7 + indent}px`,
                       borderBottom: "1px solid var(--line)",
                       borderLeft: `3px solid ${rootColor}`,
-                      background: isFocus ? "rgba(232,221,198,0.75)" :
+                      background: isFocus ? "rgba(138,58,31,0.12)" :
                         isHover ? "rgba(232,221,198,0.5)" :
                           lvl === 1 ? "var(--paper-3)" :
                             lvl === 2 ? "rgba(232,221,198,0.35)" :
@@ -2584,7 +2585,6 @@
               {/* BODY (pan capture surface) */}
               <div
                 onMouseDown={startPan}
-                onClick={() => { if (!panMovedRef.current) setFocusId(null); }}
                 style={{ position: "relative", height: totalRowsHeight, cursor: depDrag ? "crosshair" : "grab" }}>
 
                 {/* grid lines + 주말 배경 — zoom에 맞춰 */}
