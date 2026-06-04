@@ -3123,8 +3123,8 @@
 
     function MilestonePin({ cx, rowH, i, color, label }) {
       const [hov, setHov] = React.useState(false);
-      const size = 10;
-      const cy = i * rowH + rowH / 2;
+      const size = 12;
+      const cy = i * rowH + rowH / 2 - 1;
       return (
         <React.Fragment>
           <div
@@ -3135,13 +3135,13 @@
               left: cx - size / 2,
               top: cy - size / 2,
               width: size, height: size,
-              background: color,
+              background: "var(--paper-2)",
               transform: "rotate(45deg)",
-              border: `1.5px solid var(--paper)`,
-              boxShadow: hov ? `0 0 0 2px ${color}` : `0 0 0 1.5px ${color}`,
+              border: `2.5px solid ${color}`,
               zIndex: 7,
               pointerEvents: "auto",
               cursor: "default",
+              boxShadow: hov ? `0 0 0 3px ${color}55` : "none",
               transition: "box-shadow 100ms ease",
             }}
           />
