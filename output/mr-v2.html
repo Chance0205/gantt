@@ -3145,7 +3145,7 @@
     function MilestonePin({ cx, rowH, i, color, label }) {
       const [hov, setHov] = React.useState(false);
       const stroke = hexComplement(color);
-      const dh = rowH - 10, dw = Math.round(dh * 0.55);
+      const dh = rowH - 14, dw = Math.round(dh * 0.55);
       const cy = i * rowH + rowH / 2;
       const pts = `${dw/2},0 ${dw},${dh/2} ${dw/2},${dh} 0,${dh/2}`;
       return (
@@ -3155,7 +3155,7 @@
             style={{ position: "absolute", left: cx - dw/2, top: cy - dh/2, overflow: "visible", cursor: "default", zIndex: 7 }}
             width={dw} height={dh}
           >
-            <polygon points={pts} fill="var(--paper-2)" stroke={stroke} strokeWidth={hov ? 3 : 2.5}
+            <polygon points={pts} fill={color} stroke={stroke} strokeWidth={hov ? 3 : 2.5}
               style={{ filter: hov ? `drop-shadow(0 0 4px ${stroke})` : "none" }} />
           </svg>
           {hov && label && (
