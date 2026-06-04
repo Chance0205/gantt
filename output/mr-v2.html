@@ -3145,8 +3145,8 @@
     function MilestonePin({ cx, rowH, i, color, label }) {
       const [hov, setHov] = React.useState(false);
       const stroke = hexComplement(color);
-      const dw = rowH + 6, dh = rowH - 4;
-      const cy = i * rowH + rowH / 2 - 1;
+      const dh = rowH - 10, dw = Math.round(dh * 0.55);
+      const cy = i * rowH + rowH / 2;
       const pts = `${dw/2},0 ${dw},${dh/2} ${dw/2},${dh} 0,${dh/2}`;
       return (
         <React.Fragment>
