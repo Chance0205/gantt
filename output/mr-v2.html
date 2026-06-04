@@ -2840,6 +2840,18 @@
                         onDoubleClick={() => setDetailId(r.id)} />
                     );
                   }
+                  if (r.type === 'milestone') {
+                    if (!r.start) return null;
+                    const cx = dayDiff(viewStart, r.start) * dayW + dayW / 2;
+                    return (
+                      <MilestoneMarker key={r.id} r={r} cx={cx} rowH={rowH} i={i} color={color}
+                        isHover={hover === r.id} isFocus={focusId === r.id}
+                        onEnter={() => setHover(r.id)} onLeave={() => setHover(null)}
+                        onBarDown={canEdit(r) ? (e) => startBarDrag(e, r, "move", 0) : () => {}}
+                        onDoubleClick={() => setDetailId(r.id)}
+                        onClick={() => setFocusId(focusId === r.id ? null : r.id)} />
+                    );
+                  }
                   const y = i * rowH + 5;
                   const h = rowH - 10;
                   const segs = r.segments || [{ start: r.start, end: r.end }];
@@ -3073,6 +3085,46 @@
           )}
         </div>);
 
+    }
+
+    function MilestoneMarker({ r, cx, rowH, i, color, isHover, isFocus, onEnter, onLeave, onBarDown, onDoubleClick, onClick }) {
+      const size = 14;
+      const cy = i * rowH + rowH / 2;
+      return (
+        <React.Fragment>
+          <div
+            onMouseEnter={onEnter} onMouseLeave={onLeave}
+            onMouseDown={(e) => { e.stopPropagation(); onBarDown(e); }}
+            onClick={(e) => { e.stopPropagation(); onClick && onClick(); }}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+            title={r.name}
+            style={{
+              position: "absolute",
+              left: cx - size / 2,
+              top: cy - size / 2,
+              width: size, height: size,
+              background: color,
+              transform: "rotate(45deg)",
+              cursor: "move",
+              border: `2px solid ${color}88`,
+              boxShadow: isHover || isFocus ? `0 0 0 3px ${color}44, 0 4px 12px -4px rgba(0,0,0,0.3)` : "none",
+              zIndex: isHover || isFocus ? 5 : 3,
+              transition: "box-shadow 120ms ease",
+            }}
+          />
+          {(isHover || isFocus) && (
+            <div style={{
+              position: "absolute",
+              left: cx + size / 2 + 8,
+              top: cy - 8,
+              fontSize: 11, color,
+              whiteSpace: "nowrap", pointerEvents: "none",
+              fontFamily: "IBM Plex Sans, sans-serif",
+              textShadow: "0 1px 2px var(--paper)",
+            }}>{r.name}</div>
+          )}
+        </React.Fragment>
+      );
     }
 
     // ====================================================================
@@ -3542,14 +3594,17 @@
       const [editPct, setEditPct]     = useState(item.pct ?? 0);
       const [editOwner, setEditOwner] = useState(item.owner || null);
       const [editCollabs, setEditCollabs] = useState(item.collaborators || []);
+      const [editMilestone, setEditMilestone] = useState(item.type === 'milestone');
       const [saved, setSaved] = useState(false);
 
       const handleSave = () => {
         const patch = { notes, pct: editPct, owner: editOwner, collaborators: editCollabs };
+        if (!item.isSummary) patch.type = editMilestone ? 'milestone' : null;
         if (singleSeg) {
-          patch.start = editStart ? new Date(editStart + 'T00:00:00') : item.start;
-          patch.end   = editEnd   ? new Date(editEnd   + 'T00:00:00') : item.end;
-        } else if (multiSeg) {
+          const d = editStart ? new Date(editStart + 'T00:00:00') : item.start;
+          patch.start = d;
+          patch.end   = editMilestone ? d : (editEnd ? new Date(editEnd + 'T00:00:00') : item.end);
+        } else if (multiSeg && !editMilestone) {
           patch.segments = editSegs.map(s => ({
             start: s.start ? new Date(s.start + 'T00:00:00') : null,
             end:   s.end   ? new Date(s.end   + 'T00:00:00') : null,
@@ -3597,20 +3652,34 @@
             {/* Edit fields */}
             <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "68px 1fr", rowGap: 14, columnGap: 14, alignItems: "center" }}>
 
+              {/* 마일스톤 — 리프이고 canEdit인 경우만 */}
+              {!item.isSummary && canEdit && (
+                <React.Fragment>
+                  <span className="mono small-caps" style={labelStyle}>마일스톤</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input type="checkbox" checked={editMilestone} onChange={(e) => setEditMilestone(e.target.checked)}
+                      style={{ accentColor: rootColor, width: 14, height: 14, cursor: "pointer" }} />
+                    <span style={{ fontSize: 12, color: "var(--ink-3)" }}>단일 날짜로 표시</span>
+                  </label>
+                </React.Fragment>
+              )}
+
               {/* 기간 — 단일 세그먼트 리프이고 canEdit인 경우만 편집 */}
-              <span className="mono small-caps" style={labelStyle}>기간</span>
+              <span className="mono small-caps" style={labelStyle}>{editMilestone ? "날짜" : "기간"}</span>
               {singleSeg && canEdit ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)}
                     style={dateInput}
                     onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
                     onBlur={(e) => e.target.style.borderColor = "var(--line-2)"} />
-                  <span style={{ color: "var(--ink-4)", fontSize: 11 }}>→</span>
-                  <input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)}
-                    style={dateInput}
-                    onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                    onBlur={(e) => e.target.style.borderColor = "var(--line-2)"} />
-                  {dur > 0 && <span className="mono" style={{ color: "var(--ink-4)", fontSize: 11 }}>{dur}d</span>}
+                  {!editMilestone && <React.Fragment>
+                    <span style={{ color: "var(--ink-4)", fontSize: 11 }}>→</span>
+                    <input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)}
+                      style={dateInput}
+                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                      onBlur={(e) => e.target.style.borderColor = "var(--line-2)"} />
+                    {dur > 0 && <span className="mono" style={{ color: "var(--ink-4)", fontSize: 11 }}>{dur}d</span>}
+                  </React.Fragment>}
                 </div>
               ) : (
                 <span style={{ fontSize: 13, color: "var(--ink-2)", display: "flex", alignItems: "baseline", gap: 6 }}>
