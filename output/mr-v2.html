@@ -2457,8 +2457,11 @@
                           letterSpacing: lvl === 1 ? "0.02em" : 0
                         }} />
                       {lvl === 3 &&
-                        <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1 }}>
-                          {fmtDate(r.start)} → {fmtDate(r.end)}{r.start && r.end ? ` · ${dayDiff(r.start, r.end)}d` : ""}
+                        <div className="mono" style={{ fontSize: 10, color: "var(--ink-4)", letterSpacing: 0.3, marginTop: 1, display: "flex", alignItems: "center", gap: 5 }}>
+                          <span>{fmtDate(r.start)} → {fmtDate(r.end)}{r.start && r.end ? ` · ${dayDiff(r.start, r.end)}d` : ""}</span>
+                          {r.baseEnd && r.end && r.end > r.baseEnd &&
+                            <span style={{ color: "#c44b3d", fontSize: 9.5 }} title={`기준선 대비 +${dayDiff(r.baseEnd, r.end)}d 지연`}>▲{dayDiff(r.baseEnd, r.end)}d</span>
+                          }
                         </div>
                       }
                     </div>
@@ -2870,12 +2873,15 @@
                     <div key={`${r.id}-base`} style={{
                       position: "absolute",
                       left: dayDiff(viewStart, r.baseStart) * dayW,
-                      top: y, width: Math.max(dayW * 0.7, dayDiff(r.baseStart, r.baseEnd) * dayW), height: h,
-                      background: `${color}18`,
-                      border: `1.5px dashed ${color}66`,
+                      top: y - 2,
+                      width: Math.max(dayW * 0.7, dayDiff(r.baseStart, r.baseEnd) * dayW),
+                      height: h + 4,
+                      background: "transparent",
+                      border: `2px dashed ${color}`,
                       borderRadius: 3,
                       pointerEvents: "none",
-                      zIndex: 2,
+                      zIndex: 1,
+                      opacity: 0.5,
                     }} />
                   ) : null;
                   const bars = sortedIdx.map(({ s: seg, idx: segIdx }, sortedPos) => {
