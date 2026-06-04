@@ -799,6 +799,8 @@
         ...it,
         start: it.start instanceof Date ? it.start.toISOString() : it.start,
         end: it.end instanceof Date ? it.end.toISOString() : it.end,
+        baseStart: it.baseStart instanceof Date ? it.baseStart.toISOString() : it.baseStart,
+        baseEnd: it.baseEnd instanceof Date ? it.baseEnd.toISOString() : it.baseEnd,
         segments: (it.segments || []).map(s => ({
           start: s.start instanceof Date ? s.start.toISOString() : s.start,
           end: s.end instanceof Date ? s.end.toISOString() : s.end,
@@ -817,6 +819,8 @@
           ...it,
           start: it.start ? toMidnight(new Date(it.start)) : undefined,
           end: it.end ? toMidnight(new Date(it.end)) : undefined,
+          baseStart: it.baseStart ? toMidnight(new Date(it.baseStart)) : undefined,
+          baseEnd: it.baseEnd ? toMidnight(new Date(it.baseEnd)) : undefined,
         };
         if (it.segments && it.segments.length > 0) {
           item.segments = it.segments.map(s => ({
@@ -1787,7 +1791,11 @@
           <div>
             <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
             <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} currentUser={currentUser} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)}
-              onResetPat={() => { localStorage.removeItem('__gh_pat__' + (currentUser || '')); saveToServer(); }} />
+              onResetPat={() => { localStorage.removeItem('__gh_pat__' + (currentUser || '')); saveToServer(); }}
+              onFixAllBaselines={() => {
+                setItems(prev => prev.map(it => (!it.isSummary && it.start && it.end) ? { ...it, baseStart: it.start, baseEnd: it.end } : it));
+                dirtyIdsRef.current = new Set(items.filter(it => !it.isSummary && it.start && it.end).map(it => it.id));
+              }} />
             <div style={{
               background: "var(--paper-2)",
               border: "1px solid var(--line)",
@@ -2072,7 +2080,7 @@
       );
     }
 
-    function Toolbar({ v, zoom, isAdmin, currentUser, setTweak, onExport, onImport, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor, onResetPat }) {
+    function Toolbar({ v, zoom, isAdmin, currentUser, setTweak, onExport, onImport, saveStatus, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onTeam, onVendor, onResetPat, onFixAllBaselines }) {
       const fileRef = useRef(null);
       return (
         <div style={{
@@ -2092,6 +2100,8 @@
                 onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onImport(f); e.target.value = ""; }} />
               <ToolbarBtn onClick={onTeam} title="팀원 목록 편집">👥 Team</ToolbarBtn>
               <ToolbarBtn onClick={onVendor} title="외주사 목록 편집">🏭 Vendor</ToolbarBtn>
+              <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
+              <ToolbarBtn onClick={onFixAllBaselines} title="전체 태스크의 현재 날짜를 기준선으로 고정">📌 Baseline</ToolbarBtn>
               <span style={{ width: 1, height: 20, background: "var(--line-2)", margin: "0 4px" }} />
               <ToolbarBtn onClick={onExport} title="Download current schedule as JSON">↓ Export</ToolbarBtn>
               <ToolbarBtn onClick={() => fileRef.current && fileRef.current.click()} title="Load schedule from JSON file">↑ Import</ToolbarBtn>
@@ -2856,6 +2866,18 @@
                   const sortedIdx = segs
                     .map((s, idx) => ({ s, idx }))
                     .sort((a, b) => a.s.start - b.s.start);
+                  const baseBar = (r.baseStart && r.baseEnd) ? (
+                    <div key={`${r.id}-base`} style={{
+                      position: "absolute",
+                      left: dayDiff(viewStart, r.baseStart) * dayW,
+                      top: y, width: Math.max(dayW * 0.7, dayDiff(r.baseStart, r.baseEnd) * dayW), height: h,
+                      background: `${color}18`,
+                      border: `1.5px dashed ${color}66`,
+                      borderRadius: 3,
+                      pointerEvents: "none",
+                      zIndex: 2,
+                    }} />
+                  ) : null;
                   const bars = sortedIdx.map(({ s: seg, idx: segIdx }, sortedPos) => {
                     const isLastSeg = sortedPos === sortedIdx.length - 1;
                     const isFirstSeg = sortedPos === 0;
@@ -2898,7 +2920,7 @@
                     const cx = dayDiff(viewStart, ms.date) * dayW + dayW / 2;
                     return <MilestonePin key={`${r.id}-ms-${msIdx}`} cx={cx} rowH={rowH} i={i} color={color} label={ms.label} />;
                   });
-                  return [...bars, ...msPins];
+                  return [baseBar, ...bars, ...msPins];
                 })}
               </div>
             </div>
@@ -2908,6 +2930,8 @@
             const detailItem = rows.find((r) => r.id === detailId);
             return detailItem ? <TaskDetailCard item={detailItem} rows={allRows || rows} onClose={() => setDetailId(null)}
               canEdit={canEdit(detailItem)} isAdmin={isAdmin}
+              onSetBaseline={() => updateItem(detailId, { baseStart: detailItem.start, baseEnd: detailItem.end })}
+              onClearBaseline={() => updateItem(detailId, { baseStart: null, baseEnd: null })}
               onSave={(patch) => {
                 const { start, end, segments, ...rest } = patch;
                 updateItem(detailId, rest);
@@ -3581,7 +3605,7 @@
     }
 
     // ── 태스크 상세 카드 ──────────────────────────────────────────────────────────
-    function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin }) {
+    function TaskDetailCard({ item, rows, onClose, onSave, canEdit, isAdmin, onSetBaseline, onClearBaseline }) {
       const toInputDate = (dt) => {
         if (!(dt instanceof Date)) return '';
         const y = dt.getFullYear();
@@ -3796,6 +3820,36 @@
                 </React.Fragment>
               )}
             </div>
+
+            {/* Baseline */}
+            {!item.isSummary && canEdit && (
+              <div style={{ padding: "10px 20px", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ fontSize: 10.5, color: "var(--ink-3)", letterSpacing: "0.07em", fontFamily: "IBM Plex Mono, monospace", textTransform: "uppercase", flexShrink: 0 }}>기준선</div>
+                {item.baseStart && item.baseEnd ? (
+                  <React.Fragment>
+                    <span style={{ fontSize: 12, color: "var(--ink-3)", fontFamily: "IBM Plex Mono, monospace" }}>
+                      {fmtDate(item.baseStart)} → {fmtDate(item.baseEnd)}
+                    </span>
+                    <button onClick={() => { onSetBaseline(); }}
+                      style={{ marginLeft: "auto", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                      재고정
+                    </button>
+                    <button onClick={() => { onClearBaseline(); }}
+                      style={{ border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-4)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                      초기화
+                    </button>
+                  </React.Fragment>
+                ) : (
+                  <React.Fragment>
+                    <span style={{ fontSize: 12, color: "var(--ink-4)" }}>미설정</span>
+                    <button onClick={() => { onSetBaseline(); }}
+                      style={{ marginLeft: "auto", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 3, background: "var(--paper)", color: "var(--ink-2)", fontFamily: "IBM Plex Mono, monospace", fontSize: 10, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                      현재 날짜로 고정
+                    </button>
+                  </React.Fragment>
+                )}
+              </div>
+            )}
 
             {/* Notes */}
             <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--line)" }}>
