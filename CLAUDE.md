@@ -82,3 +82,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
   - 우클릭 컨텍스트 메뉴에 추가
   - Ctrl+C / Ctrl+V 단축키
   - 새 ID 생성, deps 제거
+
+## 이번 세션 구현 완료
+
+- **Task-level merge**: 저장 시 서버 최신 JSON fetch → dirty 태스크 ID만 병합 → 동시 저장 충돌 방지
+- **마일스톤 핀**: 태스크 바 위에 다이아몬드 표시. 태스크 팝업 > 마일스톤 섹션에서 날짜+이름 추가/삭제. 보색 테두리, 태스크 색 채움
+- **기준선(Baseline)**: `baseStart`/`baseEnd` 저장. 툴바 📌 Baseline 버튼으로 전체 고정, 팝업에서 개별 고정/초기화. 지연 시 점선 바 + 왼쪽 패널 ▲Nd 표시
+- **URL 파라미터 대소문자 정규화**: `?user=cs` → 자동으로 `CS`로 변환
