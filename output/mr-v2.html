@@ -1789,7 +1789,7 @@
       return (
         <OwnersCtx.Provider value={{ owners: allOwners, teams: allTeams, ownerTaskCounts, totalLeaves: stats.total }}>
           <div>
-            <Masthead stats={stats} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
+            <Masthead stats={stats} enriched={enriched} meta={meta} updateMeta={updateMeta} projStart={projStart} projEnd={projEnd} />
             <Toolbar v={v} zoom={zoom} isAdmin={isAdmin} currentUser={currentUser} setTweak={setTweak} onExport={exportJSON} onImport={importJSON} saveStatus={saveStatus} onSave={saveToServer} isHTTP={isHTTP} isLocal={isLocal} isGitHubPages={isGitHubPages} serverOnline={serverOnline} lastSavedAt={lastSavedAt} onTeam={() => setShowTeamModal(true)} onVendor={() => setShowVendorModal(true)}
               onResetPat={() => { localStorage.removeItem('__gh_pat__' + (currentUser || '')); saveToServer(); }}
               onFixAllBaselines={() => {
@@ -1954,8 +1954,29 @@
       );
     }
 
-    function Masthead({ stats, meta, updateMeta, projStart, projEnd }) {
+    function Masthead({ stats, enriched, meta, updateMeta, projStart, projEnd }) {
       const totalDays = projStart && projEnd ? dayDiff(projStart, projEnd) : 0;
+      const [activePanel, setActivePanel] = useState(null);
+
+      const panels = useMemo(() => {
+        if (!enriched) return {};
+        const leaves = enriched.filter(r => !r.isSummary);
+        return {
+          Leaves: leaves,
+          Summaries: enriched.filter(r => r.isSummary),
+          Shipped: leaves.filter(r => r.pct === 100),
+        };
+      }, [enriched]);
+
+      const toggle = (label) => setActivePanel(p => p === label ? null : label);
+
+      React.useEffect(() => {
+        if (!activePanel) return;
+        const close = (e) => { if (!e.target.closest('[data-statpanel]')) setActivePanel(null); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+      }, [activePanel]);
+
       return (
         <header style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid var(--ink)", paddingBottom: 14 }}>
@@ -2000,25 +2021,61 @@
               </h1>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, auto)", gap: 24, paddingBottom: 6 }}>
-              <Stat label="Leaves" value={stats.total} />
-              <Stat label="Summaries" value={stats.summaries} />
-              <Stat label="Shipped" value={stats.done} />
+            <div data-statpanel="true" style={{ display: "grid", gridTemplateColumns: "repeat(4, auto)", gap: 24, paddingBottom: 6 }}>
+              {["Leaves", "Summaries", "Shipped"].map(label => (
+                <Stat key={label} label={label}
+                  value={label === "Leaves" ? stats.total : label === "Summaries" ? stats.summaries : stats.done}
+                  active={activePanel === label}
+                  onClick={() => toggle(label)}
+                  items={panels[label] || []}
+                  enriched={enriched} />
+              ))}
               <Stat label="Overall" value={`${stats.overall}%`} accent />
             </div>
           </div>
 
         </header>);
-
     }
 
-    function Stat({ label, value, accent }) {
+    function Stat({ label, value, accent, active, onClick, items, enriched }) {
       return (
-        <div style={{ textAlign: "right", borderRight: "1px solid var(--line-2)", paddingRight: 24 }}>
-          <div className="serif" style={{ fontSize: 38, lineHeight: 1, color: accent ? "var(--accent)" : "var(--ink)" }}>{value}</div>
+        <div style={{ textAlign: "right", borderRight: "1px solid var(--line-2)", paddingRight: 24, position: "relative" }}>
+          <div className="serif"
+            onClick={onClick}
+            style={{ fontSize: 38, lineHeight: 1, color: accent ? "var(--accent)" : "var(--ink)", cursor: onClick ? "pointer" : "default",
+              textDecoration: active ? "underline" : "none", textDecorationColor: "var(--line-2)", textUnderlineOffset: 4 }}>{value}</div>
           <div className="mono small-caps" style={{ color: "var(--ink-3)", marginTop: 4 }}>{label}</div>
+          {active && items && (
+            <div style={{
+              position: "absolute", right: 24, top: "100%", marginTop: 8, zIndex: 100,
+              background: "var(--paper-2)", border: "1px solid var(--line)",
+              borderRadius: 5, boxShadow: "0 8px 24px -8px rgba(0,0,0,0.25)",
+              minWidth: 260, maxWidth: 360, maxHeight: 320, overflowY: "auto",
+              textAlign: "left",
+            }}>
+              {items.length === 0
+                ? <div className="mono" style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--ink-4)" }}>없음</div>
+                : items.map((r) => {
+                  const rootColor = rootInfo(r.code || "").color;
+                  const parentCode = (r.code || "").split(".").slice(0, -1).join(".");
+                  const parent = parentCode && enriched ? enriched.find(x => x.code === parentCode) : null;
+                  return (
+                    <div key={r.id} style={{ padding: "7px 14px", borderBottom: "1px solid var(--line-2)", display: "flex", flexDirection: "column", gap: 2 }}>
+                      {parent && <span style={{ fontSize: 10, color: "var(--ink-4)" }}>{parent.name}</span>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="mono" style={{ fontSize: 10, color: rootColor, fontWeight: 700, flexShrink: 0 }}>{r.code}</span>
+                        <span style={{ fontSize: 12, color: "var(--ink-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                        <span className="mono" style={{ fontSize: 10.5, color: "var(--ink-4)", flexShrink: 0 }}>
+                          {r.isSummary ? `${r.leafCount || 0}개` : `${r.pct}%`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+          )}
         </div>);
-
     }
 
     function SaveIndicator({ status, onSave, isHTTP, isLocal, isGitHubPages, serverOnline, lastSavedAt, onResetPat }) {
