@@ -4153,6 +4153,19 @@
           .sort((a, b) => b.overdueDays - a.overdueDays);
       }, [enriched]);
 
+      const milestones = useMemo(() => {
+        if (!enriched) return [];
+        const result = [];
+        enriched.forEach(r => {
+          if (!r.isSummary && r.milestones && r.milestones.length > 0) {
+            r.milestones.forEach(ms => {
+              if (ms.date) result.push({ date: ms.date, label: ms.label, task: r });
+            });
+          }
+        });
+        return result.sort((a, b) => a.date - b.date);
+      }, [enriched]);
+
       return (
         <footer style={{ marginTop: 32, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
           <div>
@@ -4258,6 +4271,39 @@
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {/* 마일스톤 */}
+            {milestones.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                  <div className="mono small-caps" style={{ color: "var(--ink-3)" }}>Milestones</div>
+                  <span style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10, color: "var(--paper)", background: "var(--ink-3)", borderRadius: 99, padding: "1px 6px", letterSpacing: 0.4 }}>
+                    {milestones.length}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  {milestones.map((ms, i) => {
+                    const rootColor = rootInfo(ms.task.code || "").color;
+                    const isPast = ms.date < TODAY;
+                    return (
+                      <div key={`${ms.task.id}-${i}`} style={{
+                        padding: "6px 0",
+                        borderBottom: i < milestones.length - 1 ? "1px dashed var(--line-2)" : "none",
+                        opacity: isPast ? 0.45 : 1,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <svg width={9} height={13} style={{ flexShrink: 0 }}>
+                            <polygon points="4.5,0 9,6.5 4.5,13 0,6.5" fill={rootColor} stroke={hexComplement(rootColor)} strokeWidth={1.5} />
+                          </svg>
+                          <span className="mono" style={{ fontSize: 10, color: rootColor, fontWeight: 700, letterSpacing: 0.3, flexShrink: 0 }}>{ms.task.code}</span>
+                          <span style={{ fontSize: 12, color: "var(--ink-2)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ms.label || ms.task.name}</span>
+                          <span className="mono" style={{ fontSize: 10.5, color: isPast ? "var(--ink-4)" : "var(--ink-2)", whiteSpace: "nowrap" }}>{fmtDate(ms.date)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
