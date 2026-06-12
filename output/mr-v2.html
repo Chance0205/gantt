@@ -915,7 +915,7 @@
     // ====================================================================
     function App() {
       // URL 파라미터 읽기
-      const currentUser = (new URLSearchParams(window.location.search).get('user') || '').toUpperCase() || null;
+      const currentUser = (new URLSearchParams(window.location.search.toLowerCase()).get('user') || '').toUpperCase() || null;
       // ?view 파라미터이거나 ?user=CS이면 어드민 (모든 태스크 편집 가능)
       const isAdmin = currentUser === 'CS' || currentUser === 'KV';
 
