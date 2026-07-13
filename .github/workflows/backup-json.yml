@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -41,4 +41,5 @@ jobs:
           git add backups/
           git diff --cached --quiet && echo "No changes to commit" || \
             git commit -m "Backup $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase origin main
           git push
